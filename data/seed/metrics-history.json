@@ -1,0 +1,16 @@
+{
+  "$comment": "历史每日聚合指标。刻意留空：看板上的所有数字都来自你实际产生的处理日志（data/runtime/agent-logs.json），没有一条是编的。这样演示时说「这些指标是真实算出来的」才站得住。",
+  "$ifYouWantDemoData": "想要一条好看的趋势线用于截图，可以按下面的结构往 daily 里补数据。口径约束：autoResolved + escalated = conversations（一次会话要么 Agent 闭环、要么转人工），knowledgeHit ≤ conversations。不满足会导致看板上解决率 + 转人工率不等于 100%。",
+  "$rowShape": {
+    "date": "2026-08-26",
+    "conversations": 0,
+    "autoResolved": 0,
+    "escalated": 0,
+    "knowledgeHit": 0,
+    "ticketsCreated": 0,
+    "approvalsCreated": 0,
+    "avgLatencyMs": 0,
+    "byDomain": { "IT": 0, "HR": 0, "FINANCE": 0, "ADMIN": 0, "UNKNOWN": 0 }
+  },
+  "daily": []
+}

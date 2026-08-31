@@ -1,0 +1,292 @@
+{
+  "$comment": "工具注册表。每个工具描述 = 大模型看到的 function schema；endpoint 指向本项目的 mock API，后续替换为真实企业系统接口即可，Agent 侧无需改动。args[].from 支持 slot（意图槽位）/ context（上下文取值路径）/ const（固定值）。",
+  "version": "0.1.0",
+  "tools": [
+    {
+      "id": "hr.get_employee",
+      "name": "查询员工信息",
+      "description": "根据工号查询员工姓名、部门、职级、入职日期、直属上级、办公地。",
+      "endpoint": "/api/employees/:employeeId",
+      "method": "GET",
+      "sideEffect": "read",
+      "requiresApproval": false,
+      "args": [
+        {
+          "name": "employeeId",
+          "type": "string",
+          "required": true,
+          "from": "context",
+          "path": "employee.id"
+        }
+      ]
+    },
+    {
+      "id": "it.get_permissions",
+      "name": "查询权限状态",
+      "description": "查询员工在各业务系统中的权限授予状态、有效期与授权级别。",
+      "endpoint": "/api/permissions",
+      "method": "GET",
+      "sideEffect": "read",
+      "requiresApproval": false,
+      "args": [
+        {
+          "name": "employeeId",
+          "type": "string",
+          "required": true,
+          "from": "context",
+          "path": "employee.id"
+        },
+        {
+          "name": "system",
+          "type": "string",
+          "required": false,
+          "from": "slot",
+          "slot": "system"
+        }
+      ]
+    },
+    {
+      "id": "kb.search",
+      "name": "检索企业知识库",
+      "description": "在 IT / HR / 财务 / 行政知识库中检索制度条款，返回带来源标识与相似度的片段。",
+      "endpoint": "/api/knowledge/search",
+      "method": "GET",
+      "sideEffect": "read",
+      "requiresApproval": false,
+      "args": [
+        {
+          "name": "q",
+          "type": "string",
+          "required": true,
+          "from": "context",
+          "path": "intent.query"
+        },
+        {
+          "name": "domain",
+          "type": "string",
+          "required": false,
+          "from": "context",
+          "path": "intent.domain"
+        }
+      ]
+    },
+    {
+      "id": "ticket.create",
+      "name": "创建工单",
+      "description": "为需要人工/系统落地的诉求创建工单，自动路由到对应职能团队并按风险等级设置 SLA。",
+      "endpoint": "/api/tickets",
+      "method": "POST",
+      "sideEffect": "write",
+      "requiresApproval": false,
+      "args": [
+        {
+          "name": "employeeId",
+          "type": "string",
+          "required": true,
+          "from": "context",
+          "path": "employee.id"
+        },
+        {
+          "name": "domain",
+          "type": "string",
+          "required": true,
+          "from": "context",
+          "path": "intent.domain"
+        },
+        {
+          "name": "intentId",
+          "type": "string",
+          "required": false,
+          "from": "context",
+          "path": "intent.id",
+          "$comment": "不能设为必填：意图未识别时（兜底 Skill）intentId 就是 null，设成必填会让整个工具调用被跳过 —— 后果是知识缺口记下了但没人跟进，而回复却告诉员工已转人工。Ticket/Approval 的类型定义里 intentId 本来就允许 null。"
+        },
+        {
+          "name": "title",
+          "type": "string",
+          "required": true,
+          "from": "context",
+          "path": "intent.title"
+        },
+        {
+          "name": "description",
+          "type": "string",
+          "required": true,
+          "from": "context",
+          "path": "intent.query"
+        },
+        {
+          "name": "riskLevel",
+          "type": "string",
+          "required": true,
+          "from": "context",
+          "path": "risk.level"
+        },
+        {
+          "name": "slots",
+          "type": "object",
+          "required": false,
+          "from": "context",
+          "path": "intent.slots"
+        }
+      ]
+    },
+    {
+      "id": "ticket.update_status",
+      "name": "更新工单状态",
+      "description": "推进工单状态：OPEN → IN_PROGRESS → RESOLVED / CLOSED / REJECTED，并写入处理备注。",
+      "endpoint": "/api/tickets/:ticketId",
+      "method": "PATCH",
+      "sideEffect": "write",
+      "requiresApproval": false,
+      "args": [
+        {
+          "name": "ticketId",
+          "type": "string",
+          "required": true,
+          "from": "slot",
+          "slot": "ticketId"
+        },
+        {
+          "name": "status",
+          "type": "string",
+          "required": true,
+          "from": "slot",
+          "slot": "status"
+        },
+        {
+          "name": "note",
+          "type": "string",
+          "required": false,
+          "from": "slot",
+          "slot": "note"
+        }
+      ]
+    },
+    {
+      "id": "approval.create",
+      "name": "创建审批 / 人工确认任务",
+      "description": "高风险事项创建人工确认任务，附带 Agent 建议动作与判定依据，等待人工确认、驳回或接管。",
+      "endpoint": "/api/approvals",
+      "method": "POST",
+      "sideEffect": "write",
+      "requiresApproval": true,
+      "args": [
+        {
+          "name": "employeeId",
+          "type": "string",
+          "required": true,
+          "from": "context",
+          "path": "employee.id"
+        },
+        {
+          "name": "domain",
+          "type": "string",
+          "required": true,
+          "from": "context",
+          "path": "intent.domain"
+        },
+        {
+          "name": "intentId",
+          "type": "string",
+          "required": false,
+          "from": "context",
+          "path": "intent.id",
+          "$comment": "不能设为必填：意图未识别时（兜底 Skill）intentId 就是 null，设成必填会让整个工具调用被跳过 —— 后果是知识缺口记下了但没人跟进，而回复却告诉员工已转人工。Ticket/Approval 的类型定义里 intentId 本来就允许 null。"
+        },
+        {
+          "name": "title",
+          "type": "string",
+          "required": true,
+          "from": "context",
+          "path": "intent.title"
+        },
+        {
+          "name": "riskLevel",
+          "type": "string",
+          "required": true,
+          "from": "context",
+          "path": "risk.level"
+        },
+        {
+          "name": "riskReasons",
+          "type": "array",
+          "required": true,
+          "from": "context",
+          "path": "risk.reasons"
+        },
+        {
+          "name": "suggestedAction",
+          "type": "string",
+          "required": true,
+          "from": "context",
+          "path": "intent.suggestedAction"
+        },
+        {
+          "name": "ticketId",
+          "type": "string",
+          "required": false,
+          "from": "context",
+          "path": "intent.ticketId"
+        }
+      ]
+    },
+    {
+      "id": "kb.record_gap",
+      "name": "记录未命中问题",
+      "description": "知识库无命中时沉淀一条待补充知识条目，供内容运营补写。",
+      "endpoint": "/api/knowledge/gaps",
+      "method": "POST",
+      "sideEffect": "write",
+      "requiresApproval": false,
+      "args": [
+        {
+          "name": "question",
+          "type": "string",
+          "required": true,
+          "from": "context",
+          "path": "intent.query"
+        },
+        {
+          "name": "domain",
+          "type": "string",
+          "required": true,
+          "from": "context",
+          "path": "intent.domain"
+        },
+        {
+          "name": "employeeId",
+          "type": "string",
+          "required": true,
+          "from": "context",
+          "path": "employee.id"
+        },
+        {
+          "name": "intentId",
+          "type": "string",
+          "required": false,
+          "from": "context",
+          "path": "intent.id"
+        }
+      ]
+    },
+    {
+      "id": "log.trace",
+      "name": "记录 Agent 处理日志",
+      "description": "写入一条完整的处理链路日志：意图、检索命中、风险判定、工具调用、耗时、最终动作。",
+      "endpoint": "/api/logs",
+      "method": "POST",
+      "sideEffect": "write",
+      "requiresApproval": false,
+      "args": [
+        {
+          "name": "trace",
+          "type": "object",
+          "required": true,
+          "from": "context",
+          "path": "trace"
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,113 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/**
+ * 全站配色的唯一入口。
+ * 值是空格分隔的 RGB 通道（配合 tailwind.config.ts 里的 rgb(var(--x) / <alpha-value>)），
+ * 这样 bg-surface/60 这类透明度修饰符依然可用。
+ *
+ * 文字四级层次的对比度（相对白底，WCAG AA 正文要求 ≥ 4.5:1）：
+ *   ink        #0f172a  16.9:1
+ *   ink-soft   #334155  10.4:1
+ *   ink-muted  #475569   7.6:1
+ *   ink-faint  #5c6a7f   5.6:1
+ */
+:root {
+  --canvas: 245 247 251;
+  --surface: 255 255 255;
+  --surface-2: 241 244 250;
+  --line: 224 230 240;
+
+  --ink: 15 23 42;
+  --ink-soft: 51 65 85;
+  --ink-muted: 71 85 105;
+  --ink-faint: 92 106 127;
+
+  --brand: 45 84 214;
+  --brand-soft: 106 137 245;
+  --brand-ink: 30 64 175;
+  --brand-wash: 238 243 255;
+
+  /* 手写 SVG 图表用（不能走 Tailwind 类） */
+  --chart-grid: #e2e8f0;
+  --chart-track: #eef1f7;
+}
+
+@layer base {
+  html,
+  body {
+    @apply bg-canvas text-ink-soft antialiased;
+  }
+
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: #cbd5e1 transparent;
+  }
+
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: #cbd5e1;
+    border-radius: 999px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: #94a3b8;
+  }
+
+  :focus-visible {
+    @apply outline outline-2 outline-offset-2 outline-brand;
+  }
+}
+
+@layer components {
+  .card {
+    @apply rounded-xl border border-line bg-surface shadow-card;
+  }
+
+  .card-pad {
+    @apply rounded-xl border border-line bg-surface p-4 shadow-card;
+  }
+
+  .label {
+    @apply text-xs uppercase tracking-wider text-ink-faint;
+  }
+
+  .btn {
+    @apply inline-flex items-center justify-center gap-1.5 rounded-lg border border-line bg-surface px-3 py-2 text-sm font-medium text-ink-soft transition hover:border-brand/50 hover:bg-brand-wash hover:text-brand-ink disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:border-line disabled:hover:bg-surface disabled:hover:text-ink-soft;
+  }
+
+  .btn-primary {
+    @apply border-transparent bg-brand text-white hover:border-transparent hover:bg-brand-ink hover:text-white;
+  }
+
+  .btn-danger {
+    @apply border-transparent bg-risk-high text-white hover:border-transparent hover:bg-red-700 hover:text-white;
+  }
+
+  .btn-ghost {
+    @apply border-transparent bg-transparent text-ink-muted hover:bg-surface-2 hover:text-ink;
+  }
+
+  .input {
+    @apply w-full rounded-lg border border-line bg-surface px-3 py-2 text-sm text-ink shadow-sm placeholder:text-ink-faint focus:border-brand focus:outline-none;
+  }
+
+  .chip {
+    @apply inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-medium leading-5;
+  }
+
+  .table-th {
+    @apply whitespace-nowrap px-3 py-2 text-left text-xs font-medium uppercase tracking-wider text-ink-faint;
+  }
+
+  .table-td {
+    @apply px-3 py-3 align-top text-sm text-ink-soft;
+  }
+}
+
+.markdown-lite p {
+  margin-bottom: 0.5rem;
+}

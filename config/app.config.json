@@ -1,0 +1,82 @@
+{
+  "$comment": "全局运行参数。改这里不需要动代码。",
+  "app": {
+    "name": "企业内部服务智能体",
+    "shortName": "ESA",
+    "tagline": "IT / HR / 财务 / 行政 一站式智能服务台",
+    "defaultEmployeeId": "E1001"
+  },
+  "agent": {
+    "$engineComment": "mock = 规则引擎（默认，零成本零依赖）；llm = 大模型驱动意图识别与回复生成。可用环境变量 AGENT_ENGINE 覆盖。engine=llm 但缺 API Key 会直接启动失败，不会静默退回规则。",
+    "engine": "mock",
+    "maxIntentsPerTurn": 3,
+    "maxToolCallsPerTurn": 6,
+    "clarifyWhenSlotMissing": true,
+    "recordGapWhenNoHit": true
+  },
+  "llm": {
+    "$comment": "仅 engine=llm 时生效。默认填的是智谱 BigModel 的 OpenAI 兼容端点与免费模型；换供应商只改 baseUrl 与 model。全部字段都能被同名大写环境变量覆盖（LLM_BASE_URL / LLM_MODEL / LLM_TEMPERATURE ...）。",
+    "baseUrl": "https://open.bigmodel.cn/api/paas/v4",
+    "model": "glm-4.7-flash",
+    "$modelComment": "智谱当前免费的文本模型：glm-4.7-flash、glm-4.5-flash。用 npm run llm:models 可以列出你的 Key 实际可用的模型。",
+    "temperature": 0.2,
+    "maxTokens": 1600,
+    "$timeoutComment": "刻意设得不高：服务台场景下，宁可 20 秒内快速降级到规则引擎给员工一个立即可用的答复，也不要让人对着转圈等 45 秒。付费档实测 2~3 秒，20 秒非常宽裕；免费 Flash 档实测 19~27 秒且常返回 429，本来就不适合交互式使用。",
+    "timeoutMs": 20000,
+    "maxRetries": 2,
+    "$fallbackComment": "true = 单次调用失败时降级到规则引擎保证可用性，但结果里会标 degraded=true 并在链路里写明原因，绝不伪装成大模型输出。false = 直接报错。",
+    "fallbackToRules": true,
+    "$intentStrategyComment": "llm-first = 总是让大模型识别意图（最准）；rules-first-escalate = 先跑规则引擎（0 成本 ~1ms），置信度 ≥ 阈值就直接用，不够才升级到大模型。后者能省掉一次调用，延迟和 token 成本都减半。",
+    "intentStrategy": "rules-first-escalate",
+    "intentEscalationThreshold": 0.7,
+    "$extraBodyComment": "原样合并进请求体的供应商私有参数。thinking.disabled 是智谱关闭思考模式的开关，实测能把延迟降好几倍（服务台场景不需要模型长篇推理）。换成 DeepSeek / 通义 / OpenAI 时把这里改成 {} ，否则可能因为未知参数被拒。",
+    "extraBody": { "thinking": { "type": "disabled" } }
+  },
+  "retrieval": {
+    "topK": 4,
+    "$scoreThresholdComment": "低于该相似度视为未命中 → 触发知识缺口沉淀 + 转人工。用 scripts/tune-threshold.mjs 扫描正负样例后再调，当前值下正样例最低 0.24、负样例最高 0.17。",
+    "scoreThreshold": 0.2,
+    "snippetMaxChars": 320,
+    "$retrievalComment": "打分 = 章节级信号（二级标题 titleWeight + 正文 bodyWeight）+ docBonusRatio × 文档级信号（文档标题 / keywords / tags）。每个字段取最高权重而非求和，避免同一个词重复计分、以及一篇文档所有章节同分。",
+    "titleWeight": 3,
+    "keywordWeight": 2.4,
+    "tagWeight": 1.6,
+    "bodyWeight": 2,
+    "docBonusRatio": 0.35,
+    "domainMatchBonus": 0.15,
+    "crossDomainPenalty": 0.45,
+    "oovWeight": 0.6,
+    "bodyOnlyPenalty": 0.25
+  },
+  "metrics": {
+    "$comment": "看板口径参数：人工处理单次耗时（分钟）与人力成本（元/小时），用于折算节省工时与成本。",
+    "manualHandlingMinutes": {
+      "IT": 12,
+      "HR": 15,
+      "FINANCE": 18,
+      "ADMIN": 10,
+      "UNKNOWN": 12
+    },
+    "hourlyCostCNY": 85,
+    "targetResolutionRate": 0.8,
+    "targetKnowledgeHitRate": 0.85,
+    "targetEscalationRate": 0.15,
+    "targetFirstResponseMs": 2000,
+    "$baselineComment": "上线前人工服务台的基线，用于看板对比。这是口径参数（需要你按自家实际情况填），不是运行数据，所以放配置里而不是 data/ 下。",
+    "baseline": {
+      "avgFirstResponseMinutes": 47,
+      "avgResolveHours": 9.4,
+      "monthlyTicketVolume": 2180,
+      "helpdeskHeadcount": 6,
+      "satisfactionScore": 3.6
+    },
+    "$smallTalkComment": "闲聊（问候/致谢/告别/无实义输入）不计入服务请求口径。否则员工说几句「你好」就能把自助解决率刷上去，这个指标就没有意义了。",
+    "excludeSmallTalkFromMetrics": true
+  },
+  "sla": {
+    "$comment": "工单按风险等级的响应/解决时限（小时）",
+    "LOW": { "responseHours": 8, "resolveHours": 24 },
+    "MEDIUM": { "responseHours": 4, "resolveHours": 16 },
+    "HIGH": { "responseHours": 1, "resolveHours": 8 }
+  }
+}
