@@ -1,7 +1,7 @@
 import { ok, withErrorHandling } from '@/server/http';
 import { listPermissions } from '@/server/repositories/employees';
 
-/** GET /api/permissions?employeeId=E1001&system=VPN — 查询权限状态（对应工具 it.get_permissions） */
+/** GET /api/permissions?employeeId=E1001&system=VPN — 查询员工权限状态，供员工档案展示使用。 */
 export const GET = withErrorHandling(async (req: Request) => {
   const url = new URL(req.url);
   const employeeId = url.searchParams.get('employeeId') ?? undefined;

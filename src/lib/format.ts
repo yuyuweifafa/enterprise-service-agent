@@ -1,4 +1,4 @@
-import type { Domain, GapStatus, RiskLevel, TicketStatus, ApprovalStatus } from './types';
+import type { Domain, GapStatus, RiskLevel, TicketStatus } from './types';
 
 export function cn(...classes: Array<string | false | null | undefined>): string {
   return classes.filter(Boolean).join(' ');
@@ -37,8 +37,8 @@ export const DOMAIN_HEX: Record<Domain, string> = {
 
 export const RISK_LABEL: Record<RiskLevel, string> = {
   LOW: '低风险 · 自动答复',
-  MEDIUM: '中风险 · 自动建单',
-  HIGH: '高风险 · 人工确认',
+  MEDIUM: '中风险 · 需要确认',
+  HIGH: '高风险 · 不自动执行',
 };
 
 export const RISK_SHORT: Record<RiskLevel, string> = {
@@ -62,7 +62,7 @@ export const RISK_HEX: Record<RiskLevel, string> = {
 export const TICKET_STATUS_LABEL: Record<TicketStatus, string> = {
   OPEN: '待受理',
   IN_PROGRESS: '处理中',
-  PENDING_REVIEW: '待人工确认',
+  PENDING_REVIEW: '待人工接入',
   RESOLVED: '已解决',
   CLOSED: '已关闭',
   REJECTED: '已驳回',
@@ -75,20 +75,6 @@ export const TICKET_STATUS_CLASS: Record<TicketStatus, string> = {
   RESOLVED: 'border-emerald-300 bg-emerald-50 text-emerald-700',
   CLOSED: 'border-slate-300 bg-slate-100 text-slate-600',
   REJECTED: 'border-rose-300 bg-rose-50 text-rose-700',
-};
-
-export const APPROVAL_STATUS_LABEL: Record<ApprovalStatus, string> = {
-  PENDING: '待确认',
-  APPROVED: '已确认',
-  REJECTED: '已驳回',
-  TAKEN_OVER: '人工接管',
-};
-
-export const APPROVAL_STATUS_CLASS: Record<ApprovalStatus, string> = {
-  PENDING: 'border-amber-300 bg-amber-50 text-amber-700',
-  APPROVED: 'border-emerald-300 bg-emerald-50 text-emerald-700',
-  REJECTED: 'border-rose-300 bg-rose-50 text-rose-700',
-  TAKEN_OVER: 'border-brand/35 bg-brand-wash text-brand-ink',
 };
 
 export const GAP_STATUS_LABEL: Record<GapStatus, string> = {
@@ -108,8 +94,7 @@ export const GAP_STATUS_CLASS: Record<GapStatus, string> = {
 export const ACTION_LABEL: Record<string, string> = {
   answer: '自动答复',
   clarify: '追问补全',
-  create_ticket: '创建工单',
-  create_approval: '人工确认',
+  flow_entry: '流程入口',
   record_gap: '沉淀知识',
   handoff: '转人工',
 };

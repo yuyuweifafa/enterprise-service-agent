@@ -1,59 +1,34 @@
 {
-  "$comment": "多意图识别规则。mock 引擎用「关键词 + 正则 + 否定词」打分；换成大模型后这里退化为 few-shot 示例与意图白名单，无需改动结构。",
-  "version": "0.2.0",
-
-  "$outOfScopeComment": "域外判定。和「域内但知识缺失」必须分开处理，这是踩过的坑：早期没有这一层，问「今天天气怎么样」会被当成「公司还没写天气制度」，于是沉淀了一条知识缺口 + 转人工，回复说「将由内容运营补充相关制度」——逻辑上就荒谬。域外请求应该说明服务范围并引导，不建单、不沉淀、不转人工。matchMode 与 smallTalk 一致：full = 整句完全等于，contains = 包含即算。注意 contains 要谨慎，避免误伤（比如别把「代码」设成 contains，否则「代码仓库权限申请」会被误拦）。",
+  "$comment": "当前 Demo 的意图白名单：只保留闲聊/工作陪伴、知识库问答、客户评审准备、IT/行政转人工，以及 HR/财务流程入口。",
+  "version": "0.3.0",
   "outOfScope": {
     "enabled": true,
-    "replyPrefix": "这个不在企业服务台的范围内。",
-    "replySuffix": "我能帮你处理的是 IT、HR、财务、行政四类事情，比如查制度、申请权限、报修设备、提交报销、预定会议室。",
+    "replyPrefix": "这个不在小助当前的服务范围内。",
+    "replySuffix": "我现在主要能帮你：陪你理清工作、回答公司制度、准备客户评审，以及把 IT/行政问题带上下文转给人工。",
     "rules": [
-      {
-        "id": "scope.weather",
-        "label": "天气",
-        "matchMode": "contains",
-        "patterns": ["天气怎么样", "天气如何", "今天天气", "明天天气", "会不会下雨", "气温多少", "要不要带伞", "查天气"],
-        "reply": "我查不了天气，建议用手机自带的天气应用。"
-      },
-      {
-        "id": "scope.coding",
-        "label": "写代码 / 技术问答",
-        "matchMode": "contains",
-        "patterns": ["写一段", "写一个函数", "冒泡排序", "帮我写代码", "帮我改代码", "这段代码", "报什么错", "怎么实现一个", "算法题", "sql 怎么写", "正则怎么写"],
-        "reply": "我不提供编程和技术实现方面的帮助。"
-      },
-      {
-        "id": "scope.general_knowledge",
-        "label": "通用知识 / 常识问答",
-        "matchMode": "contains",
-        "patterns": ["是什么意思", "翻译成", "帮我翻译", "怎么读", "历史上", "为什么天空", "科普一下", "帮我算一下", "等于多少"],
-        "reply": "这类通用知识问题我不处理。"
-      },
       {
         "id": "scope.market_news",
         "label": "新闻 / 股价 / 市场行情",
         "matchMode": "contains",
-        "patterns": ["股价", "股票", "涨了跌了", "今天新闻", "最新消息", "汇率是多少", "比特币", "基金收益"],
-        "reply": "我不提供市场行情和新闻信息。"
+        "patterns": ["股价", "股票", "基金", "比特币", "今天新闻", "最新消息", "汇率是多少"],
+        "reply": "这类市场或新闻信息不在当前服务范围里。"
+      },
+      {
+        "id": "scope.coding",
+        "label": "编程实现",
+        "matchMode": "contains",
+        "patterns": ["写代码", "写一个函数", "冒泡排序", "sql 怎么写", "正则怎么写", "帮我改代码"],
+        "reply": "当前小助不处理编程实现问题。"
       },
       {
         "id": "scope.personal_life",
-        "label": "生活娱乐 / 个人事务",
+        "label": "生活娱乐",
         "matchMode": "contains",
-        "patterns": ["推荐个", "推荐一下附近", "哪家好吃", "午饭吃什么", "晚饭吃什么", "附近有什么", "好玩的地方", "推荐电影", "讲个笑话", "陪我聊"],
-        "reply": "生活类的事情我帮不上。"
-      },
-      {
-        "id": "scope.other_company",
-        "label": "非本公司事务",
-        "matchMode": "contains",
-        "patterns": ["别的公司", "其他公司的", "竞争对手", "帮我投简历", "外面的岗位"],
-        "reply": "我只处理本公司内部事务。"
+        "patterns": ["推荐餐厅", "哪家好吃", "午饭吃什么", "晚饭吃什么", "推荐电影", "讲个笑话"],
+        "reply": "生活娱乐类问题暂时不在当前服务范围里。"
       }
     ]
   },
-
-  "$smallTalkComment": "闲聊前置判断。这些输入在进入主管线之前就被拦下，直接给一句轻量回复：不检索、不建单、不沉淀知识缺口、不调大模型。原因：识别不出意图的兜底逻辑（转人工 + 记知识缺口）对「德国参展清关手续」是对的，对「你好」就是误报——真上线服务台队列里会堆满「你好」工单，知识缺口清单也会被污染。matchMode: full = 整句去掉标点后完全等于其中一项才算（避免「你好，我要申请VPN」被误拦）；contains = 包含即算。",
   "smallTalk": {
     "enabled": true,
     "minMeaningfulChars": 2,
@@ -62,311 +37,202 @@
         "id": "chitchat.greeting",
         "label": "问候",
         "matchMode": "full",
-        "patterns": ["你好", "您好", "哈喽", "hello", "hi", "hey", "在吗", "在么", "有人吗", "有人在吗", "早上好", "下午好", "晚上好", "早", "嗨"],
-        "reply": "你好，我是企业内部服务台助手，可以帮你处理 IT、HR、财务、行政的事情。\n\n比如：\n· 「年假还剩几天」\n· 「帮我申请 VPN 权限」\n· 「出差住宿能报多少」\n· 「笔记本蓝屏了要报修」\n\n直接说你要办的事就行。"
+        "patterns": ["你好", "您好", "哈喽", "hello", "hi", "hey", "在吗", "在么", "早上好", "下午好", "晚上好"],
+        "reply": "你好，我是小助。你可以直接告诉我一个工作目标，或者问我公司制度、IT/行政问题。"
+      },
+      {
+        "id": "chitchat.emotion",
+        "label": "情绪陪伴",
+        "matchMode": "contains",
+        "patterns": ["不开心", "心情不好", "有点烦", "很烦", "难过", "有点累", "好累", "压力好大", "有点焦虑", "很焦虑", "有点紧张"],
+        "reply": "听起来你现在状态不太好。先别急着把自己往前推，我们可以先把事情拆小一点：\n\n1. 先说说让你不开心的主要原因，是人、事、时间压力，还是不确定感？\n2. 如果你不想展开，也可以直接把今天要做的事丢给我，我帮你排一个更轻的顺序。\n3. 现在先做一件 10 分钟内能完成的小事，让状态慢慢回来。"
       },
       {
         "id": "chitchat.thanks",
         "label": "致谢",
         "matchMode": "full",
-        "patterns": ["谢谢", "谢了", "多谢", "感谢", "thanks", "thank you", "thx", "好的谢谢", "收到谢谢"],
-        "reply": "不客气。还有其他需要办的事随时说。"
-      },
-      {
-        "id": "chitchat.farewell",
-        "label": "告别",
-        "matchMode": "full",
-        "patterns": ["再见", "拜拜", "bye", "byebye", "先这样", "没事了", "不用了"],
-        "reply": "好的，有需要再来找我。"
+        "patterns": ["谢谢", "谢了", "多谢", "感谢", "thanks", "thank you", "收到谢谢"],
+        "reply": "不客气。还有其他需要处理的事情，直接说就好。"
       },
       {
         "id": "chitchat.ack",
         "label": "无实义应答",
         "matchMode": "full",
         "patterns": ["好的", "好", "嗯", "嗯嗯", "哦", "ok", "okay", "行", "知道了", "明白", "收到", "可以"],
-        "reply": "嗯，需要办什么直接说。"
-      },
-      {
-        "id": "chitchat.identity",
-        "label": "问身份能力",
-        "matchMode": "contains",
-        "patterns": ["你是谁", "你是什么", "你能做什么", "你会什么", "你能干什么", "有什么功能", "怎么用你", "你是机器人吗", "是人还是机器"],
-        "reply": "我是企业内部服务台助手，覆盖 IT、HR、财务、行政四个方面。\n\n我能做的：查制度并告诉你依据出自哪份文件哪一章、帮你提交工单、查你的档案和权限状态。\n\n我不会做的：涉及生产数据、资金支付、薪酬离职这类事项我不会自动执行，会转给对应同事人工确认。查不到制度依据时我会直接说没有，不会编。"
+        "reply": "嗯，需要我帮你理什么事，直接说。"
       }
     ]
   },
-
-  "splitConnectors": ["另外", "顺便", "还有", "同时", "以及", "此外", "再有", "并且", ";", "；", "，另", "然后"],
+  "splitConnectors": ["另外", "顺便", "还有", "同时", "以及", "此外", "然后", ";", "；", "，另"],
   "domains": {
     "IT": { "label": "IT 支持", "owner": "IT Helpdesk", "color": "#4f7cff" },
-    "HR": { "label": "人力资源", "owner": "HRBP", "color": "#a855f7" },
-    "FINANCE": { "label": "财务", "owner": "财务共享中心", "color": "#14b8a6" },
+    "HR": { "label": "人力资源", "owner": "企业 HR 流程", "color": "#a855f7" },
+    "FINANCE": { "label": "财务", "owner": "企业财务流程", "color": "#14b8a6" },
     "ADMIN": { "label": "行政", "owner": "行政前台", "color": "#f59e0b" },
-    "UNKNOWN": { "label": "待归类", "owner": "服务台值班", "color": "#64748b" }
+    "UNKNOWN": { "label": "工作助手", "owner": "小助", "color": "#64748b" }
   },
   "intents": [
     {
-      "id": "it.password_reset",
+      "id": "companion.work_chat",
+      "domain": "UNKNOWN",
+      "label": "闲聊 / 工作陪伴",
+      "skill": "companion.work",
+      "keywords": ["你好", "您好", "hello", "hi", "谢谢", "好的", "在吗", "可爱", "真好", "真棒", "有意思", "哈哈", "哈哈哈", "嘿嘿", "你是谁", "你叫什么", "不开心", "心情不好", "难过", "有点累", "好累", "有点烦", "焦虑", "紧张", "压力", "陪我", "聊聊", "理一下", "先做什么", "优先级", "今天怎么安排", "见客户", "客户有点紧张"],
+      "patterns": [
+        "(今天|最近|现在|我).*(不开心|心情不好|难过|烦|焦虑|压力|累|不知道先做什么)",
+        "(明天|今天|下周)?.*(见客户|客户评审|客户会议).*(紧张|焦虑|怕|担心)",
+        "(帮我|陪我).*(理一下|梳理|排一下).*(今天|任务|优先级|先做什么)",
+        "(我有点|有点|我很|很).*(不开心|心情不好|难过|烦|紧张|焦虑|压力|累)",
+        "(你好|你|小助).*(可爱|真好|真棒|有意思)",
+        "(哈哈|哈哈哈|嘿嘿|笑死)"
+      ],
+      "negativeKeywords": ["报销", "请假", "VPN", "电脑", "门禁", "会议室怎么约"],
+      "slots": [],
+      "knowledgeTags": [],
+      "examples": ["你好", "你好可爱啊", "哈哈哈你真有意思", "我不开心", "今天有点烦", "明天要见客户有点紧张", "帮我理一下今天先做什么"]
+    },
+    {
+      "id": "agent.goal_customer_review",
+      "domain": "UNKNOWN",
+      "label": "客户评审准备",
+      "skill": "agent.customer_review",
+      "keywords": ["客户评审", "方案评审", "客户会议", "客户拜访", "评审会", "准备事项", "准备一下", "会前准备", "会议材料", "联系客户"],
+      "patterns": [
+        "(客户|方案).*(评审|会议|拜访).*(准备|检查|安排|处理)",
+        "(明天|今天|下周).*(评审|客户会|客户会议).*(准备|检查|安排)",
+        "(帮我|替我).*(检查|准备|安排).*(评审|客户会议|客户拜访)",
+        "(我要|我明天|明天我要).*(客户).*(评审|会议)"
+      ],
+      "negativeKeywords": ["报销", "开票", "请假"],
+      "slots": [
+        { "name": "startDate", "label": "目标日期", "type": "date", "required": false },
+        { "name": "headcount", "label": "参会人数", "type": "number", "required": false }
+      ],
+      "knowledgeTags": ["客户评审", "会议室", "客户历史", "评审资料", "日程提醒"],
+      "examples": ["我明天要参加客户评审，帮我准备一下事项", "明天我要和客户评审，帮我把会议、资料和提醒准备好"]
+    },
+    {
+      "id": "it.account_login",
       "domain": "IT",
-      "label": "账号密码重置",
-      "skill": "it.self_service",
-      "keywords": ["密码", "重置密码", "改密码", "忘记密码", "登不上", "登录不了", "口令"],
-      "patterns": ["(密码|口令).*(忘|重置|改|过期)", "(登录|登陆).*(失败|不了|不上)"],
+      "label": "账号 / 登录问题",
+      "skill": "knowledge.qa",
+      "keywords": ["密码", "重置密码", "忘记密码", "登不上", "登录不了", "登陆不上", "账号", "帐号", "锁定", "解锁", "口令"],
+      "patterns": ["(密码|口令).*(忘|重置|改|过期)", "(电脑|系统|OA|邮箱|账号|帐号)?.*(登录|登陆).*(失败|不了|不上)", "(账号|帐号|账户).*(锁|冻结|解锁)"],
       "negativeKeywords": ["数据库密码", "生产密码"],
       "slots": [{ "name": "system", "label": "系统名称", "type": "enum", "required": false, "options": ["OA", "邮箱", "VPN", "CRM", "ERP", "域账号", "Wi-Fi"] }],
       "knowledgeTags": ["账号", "密码", "登录"],
-      "examples": ["OA 密码忘了怎么重置", "邮箱登不上去了"]
-    },
-    {
-      "id": "it.account_unlock",
-      "domain": "IT",
-      "label": "账号解锁",
-      "skill": "it.self_service",
-      "keywords": ["锁定", "解锁", "账号被锁", "锁住"],
-      "patterns": ["(账号|帐号|账户).*(锁|冻结)"],
-      "slots": [{ "name": "system", "label": "系统名称", "type": "enum", "required": false, "options": ["OA", "邮箱", "VPN", "CRM", "ERP", "域账号"] }],
-      "knowledgeTags": ["账号", "解锁"],
-      "examples": ["我的域账号被锁了"]
+      "examples": ["电脑登录不上怎么办", "OA 密码忘了怎么重置", "账号被锁了"]
     },
     {
       "id": "it.vpn_access",
       "domain": "IT",
-      "label": "VPN / 远程访问权限申请",
-      "skill": "it.access_request",
-      "keywords": ["VPN", "vpn", "远程访问", "内网", "远程办公权限", "翻墙"],
-      "patterns": ["(vpn|VPN).*(申请|开通|权限|连不上)", "远程.*(访问|连接).*(内网|办公)"],
-      "slots": [
-        { "name": "system", "label": "目标系统", "type": "enum", "required": false, "options": ["VPN", "内网 Wiki", "堡垒机", "测试环境"] },
-        { "name": "duration", "label": "使用期限", "type": "days", "required": false }
-      ],
+      "label": "VPN / 权限问题",
+      "skill": "knowledge.qa",
+      "keywords": ["VPN", "vpn", "远程访问", "内网", "远程办公权限", "权限", "开通权限", "访问不了"],
+      "patterns": ["(vpn|VPN).*(怎么开|申请|开通|权限|连不上|访问不了)", "(权限|远程访问).*(申请|开通|访问不了|怎么办)"],
+      "slots": [{ "name": "system", "label": "目标系统", "type": "enum", "required": false, "options": ["VPN", "内网 Wiki", "堡垒机", "测试环境"] }],
       "knowledgeTags": ["VPN", "远程访问", "权限"],
-      "examples": ["帮我开通 VPN 权限", "VPN 连不上了"]
+      "examples": ["VPN 怎么开", "VPN 连不上怎么办", "权限访问不了"]
     },
     {
-      "id": "it.software_install",
+      "id": "it.device_issue",
       "domain": "IT",
-      "label": "软件安装 / 授权申请",
-      "skill": "it.access_request",
-      "keywords": ["安装", "软件", "license", "授权", "权限", "编辑权限", "正版", "Office", "IDEA", "Photoshop", "Figma", "装个"],
-      "patterns": ["(安装|装).*(软件|Office|IDEA|Photoshop|Figma)", "(license|授权|序列号).*(申请|要)", "(Figma|figma).*(权限|编辑|授权|申请|开通)", "(申请|开通).*(Figma|figma).*(权限|授权|编辑)"],
-      "slots": [{ "name": "software", "label": "软件名称", "type": "text", "required": true }],
-      "knowledgeTags": ["软件", "授权", "安装"],
-      "examples": ["申请一个 IDEA 的正版授权", "帮我装个 Office"]
-    },
-    {
-      "id": "it.device_repair",
-      "domain": "IT",
-      "label": "设备故障报修",
-      "skill": "it.incident",
-      "keywords": ["电脑", "笔记本", "坏了", "蓝屏", "开不了机", "报修", "键盘", "屏幕", "打印机", "卡死", "死机"],
-      "patterns": ["(电脑|笔记本|显示器|打印机|键盘|鼠标).*(坏|故障|不好使|修|蓝屏|黑屏)", "(开不了机|无法启动|一直重启)"],
+      "label": "电脑 / 设备问题",
+      "skill": "knowledge.qa",
+      "keywords": ["电脑", "笔记本", "蓝屏", "开不了机", "报修", "键盘", "屏幕", "打印机", "卡死", "死机", "Wi-Fi"],
+      "patterns": ["(电脑|笔记本|显示器|打印机|键盘|鼠标|Wi-Fi).*(坏|故障|不好使|修|蓝屏|黑屏|连不上)", "(开不了机|无法启动|一直重启)"],
       "slots": [{ "name": "device", "label": "设备类型", "type": "enum", "required": false, "options": ["笔记本", "台式机", "显示器", "打印机", "键鼠", "手机"] }],
       "knowledgeTags": ["设备", "报修", "故障"],
-      "examples": ["我的笔记本蓝屏了要报修"]
-    },
-    {
-      "id": "it.data_permission",
-      "domain": "IT",
-      "label": "生产数据 / 高权限访问申请",
-      "skill": "it.privileged_access",
-      "keywords": ["生产", "生产环境", "数据库", "root", "管理员权限", "sudo", "导出数据", "全量数据", "客户名单", "堡垒机", "线上库"],
-      "patterns": ["(生产|线上|prod).*(数据库|环境|库|权限|数据)", "(root|管理员|超级管理员|sudo).*(权限|账号)", "(批量|全量|全部).*(导出|下载).*(数据|名单|客户)"],
-      "slots": [
-        { "name": "system", "label": "目标系统", "type": "text", "required": true },
-        { "name": "env", "label": "环境", "type": "enum", "required": false, "options": ["生产", "预发", "测试"] },
-        { "name": "reason", "label": "业务理由", "type": "text", "required": false }
-      ],
-      "knowledgeTags": ["权限", "生产", "数据安全"],
-      "examples": ["我要生产数据库的只读权限", "帮我导出全量客户名单"]
-    },
-    {
-      "id": "hr.leave_policy",
-      "domain": "HR",
-      "label": "假期制度咨询",
-      "skill": "hr.policy_qa",
-      "keywords": ["年假", "假期", "请假", "调休", "病假", "婚假", "产假", "陪产假", "丧假", "几天", "多少天"],
-      "patterns": ["(年假|病假|婚假|产假|陪产假|丧假|调休).*(多少|几天|规定|怎么算|政策)"],
-      "$negativeComment": "出现「想请 / 要请 / 帮我请 / 提交」这类动作词时，说明是要办事而不是问制度，让位给 hr.leave_apply。",
-      "negativeKeywords": ["提交", "帮我请", "想请", "要请", "我请"],
-      "slots": [{ "name": "leaveType", "label": "假期类型", "type": "enum", "required": false, "options": ["年假", "病假", "事假", "调休", "婚假", "产假", "陪产假", "丧假"] }],
-      "knowledgeTags": ["年假", "假期", "考勤"],
-      "examples": ["我有多少天年假", "婚假能休几天"]
-    },
-    {
-      "id": "hr.leave_apply",
-      "domain": "HR",
-      "label": "请假 / 调休申请",
-      "skill": "hr.transaction",
-      "keywords": ["请假", "休假", "调休", "帮我请", "提交请假", "休年假"],
-      "patterns": [
-        "(帮我|我要|我想|想|申请).*(请假|休假|请年假|调休)",
-        "(下周|明天|后天|\\d+月\\d+[日号]).*(请|休).*假",
-        "(请|休)\\s*\\d+(\\.\\d+)?\\s*天",
-        "(年假|病假|事假|调休|婚假|产假|陪产假|丧假).*(申请|提交|走流程)"
-      ],
-      "slots": [
-        { "name": "leaveType", "label": "假期类型", "type": "enum", "required": true, "options": ["年假", "病假", "事假", "调休", "婚假", "产假", "陪产假", "丧假"] },
-        { "name": "startDate", "label": "开始日期", "type": "date", "required": true },
-        { "name": "days", "label": "天数", "type": "days", "required": true }
-      ],
-      "knowledgeTags": ["请假", "年假", "审批"],
-      "examples": ["帮我请 3 天年假，从下周一开始"]
-    },
-    {
-      "id": "hr.social_insurance",
-      "domain": "HR",
-      "label": "社保 / 公积金 / 落户",
-      "skill": "hr.policy_qa",
-      "keywords": ["社保", "公积金", "五险一金", "落户", "居住证", "医保", "生育津贴", "缴纳基数"],
-      "patterns": ["(社保|公积金|医保|居住证|落户).*(怎么|如何|基数|转移|办)"],
-      "slots": [],
-      "knowledgeTags": ["社保", "公积金", "落户"],
-      "examples": ["社保怎么从上海转到杭州"]
-    },
-    {
-      "id": "hr.salary_inquiry",
-      "domain": "HR",
-      "label": "薪酬 / 绩效相关",
-      "skill": "hr.sensitive",
-      "keywords": ["工资", "薪酬", "薪资", "调薪", "涨薪", "绩效", "奖金", "年终奖", "个税", "工资单"],
-      "patterns": ["(工资|薪资|薪酬|绩效|奖金|年终奖).*(多少|什么时候|调|涨|算|申诉)", "(调薪|涨薪|加薪)"],
-      "slots": [],
-      "knowledgeTags": ["薪酬", "绩效"],
-      "examples": ["我想申请调薪", "为什么这个月工资少了"]
-    },
-    {
-      "id": "hr.onboarding",
-      "domain": "HR",
-      "label": "入职 / 转正流程",
-      "skill": "hr.policy_qa",
-      "keywords": ["入职", "转正", "试用期", "背调", "劳动合同", "实习转正"],
-      "patterns": ["(入职|转正|试用期).*(流程|材料|多久|需要)"],
-      "slots": [],
-      "knowledgeTags": ["入职", "转正"],
-      "examples": ["转正流程需要准备什么材料"]
-    },
-    {
-      "id": "hr.offboarding",
-      "domain": "HR",
-      "label": "离职 / 交接",
-      "skill": "hr.sensitive",
-      "keywords": ["离职", "辞职", "解约", "交接", "离职证明", "最后工作日", "裁员", "辞退", "N+1"],
-      "patterns": ["(离职|辞职|解除劳动合同|裁员|辞退)"],
-      "slots": [{ "name": "lastDay", "label": "预计最后工作日", "type": "date", "required": false }],
-      "knowledgeTags": ["离职", "交接"],
-      "examples": ["我要提离职，流程是什么"]
-    },
-    {
-      "id": "fin.reimburse_policy",
-      "domain": "FINANCE",
-      "label": "报销制度咨询",
-      "skill": "fin.policy_qa",
-      "keywords": ["报销标准", "报销制度", "能不能报", "可以报销吗", "发票要求", "差旅标准", "住宿标准", "打车"],
-      "patterns": ["(能|可以|可否).*(报销|报)", "(报销|差旅|住宿|餐补|打车).*(标准|规定|上限|额度)"],
-      "negativeKeywords": ["提交报销", "帮我报"],
-      "slots": [{ "name": "category", "label": "费用类别", "type": "enum", "required": false, "options": ["差旅", "交通", "住宿", "餐饮", "办公用品", "招待", "培训"] }],
-      "knowledgeTags": ["报销", "差旅", "标准"],
-      "examples": ["出差住宿一晚能报多少", "打车费能报销吗"]
-    },
-    {
-      "id": "fin.reimburse_submit",
-      "domain": "FINANCE",
-      "label": "提交报销单",
-      "skill": "fin.transaction",
-      "keywords": ["提交报销", "帮我报销", "报销单", "走报销", "贴发票"],
-      "patterns": ["(帮我|我要|想).*(报销|提报销|走报销)", "报销.*(\\d+).*(元|块|万)"],
-      "slots": [
-        { "name": "amount", "label": "报销金额", "type": "amount", "required": true },
-        { "name": "category", "label": "费用类别", "type": "enum", "required": false, "options": ["差旅", "交通", "住宿", "餐饮", "办公用品", "招待", "培训"] }
-      ],
-      "knowledgeTags": ["报销", "审批"],
-      "examples": ["帮我提交一笔 1200 元的差旅报销"]
-    },
-    {
-      "id": "fin.invoice",
-      "domain": "FINANCE",
-      "label": "发票 / 开票",
-      "skill": "fin.policy_qa",
-      "keywords": ["发票", "开票", "专票", "普票", "税号", "开发票", "红冲", "抬头"],
-      "patterns": ["(发票|开票|专票|普票|抬头|税号)"],
-      "slots": [],
-      "knowledgeTags": ["发票", "开票"],
-      "examples": ["公司开票信息是什么"]
-    },
-    {
-      "id": "fin.budget_approval",
-      "domain": "FINANCE",
-      "label": "预算 / 付款审批",
-      "skill": "fin.high_value",
-      "keywords": ["预算", "付款", "对公转账", "采购付款", "合同款", "预付款", "超预算"],
-      "patterns": ["(预算|付款|转账|采购).*(审批|申请|流程|超)", "(超预算|预算外)"],
-      "slots": [
-        { "name": "amount", "label": "金额", "type": "amount", "required": true },
-        { "name": "reason", "label": "事由", "type": "text", "required": false }
-      ],
-      "knowledgeTags": ["预算", "付款", "审批"],
-      "examples": ["有一笔 8 万的预算外付款要走审批"]
-    },
-    {
-      "id": "admin.access_card",
-      "domain": "ADMIN",
-      "label": "门禁卡 / 工牌",
-      "skill": "admin.facility",
-      "keywords": ["门禁", "门禁卡", "工牌", "厂牌", "刷卡", "补办", "卡丢了"],
-      "patterns": ["(门禁|工牌|厂牌).*(申请|补办|丢|坏|开通)"],
-      "slots": [],
-      "knowledgeTags": ["门禁", "工牌"],
-      "examples": ["工牌丢了怎么补办"]
+      "examples": ["电脑登录不上怎么办", "笔记本蓝屏了", "打印机连不上"]
     },
     {
       "id": "admin.meeting_room",
       "domain": "ADMIN",
       "label": "会议室 / 场地",
-      "skill": "admin.facility",
-      "keywords": ["会议室", "预定会议室", "订会议室", "场地", "投影", "大会议室"],
-      "patterns": ["(会议室|场地).*(预定|预订|订|申请|借)"],
+      "skill": "knowledge.qa",
+      "keywords": ["会议室", "预定会议室", "订会议室", "约会议室", "场地", "投影", "投屏"],
+      "patterns": ["(会议室|场地).*(怎么约|怎么订|预定|预订|订|申请|借)", "(投屏|投影).*(怎么|故障|确认|提前)"],
       "slots": [
         { "name": "startDate", "label": "使用日期", "type": "date", "required": false },
         { "name": "headcount", "label": "人数", "type": "number", "required": false }
       ],
       "knowledgeTags": ["会议室", "预定"],
-      "examples": ["订一个 20 人的会议室"]
+      "examples": ["会议室怎么约", "订一个 20 人的会议室", "会议室投屏怎么确认"]
     },
     {
-      "id": "admin.supplies",
+      "id": "admin.access_card",
       "domain": "ADMIN",
-      "label": "办公用品领用",
-      "skill": "admin.facility",
-      "keywords": ["办公用品", "领用", "笔", "本子", "纸", "打印纸", "水", "工位物品"],
-      "patterns": ["(办公用品|打印纸|笔|本子|文具).*(领|申请|要)"],
-      "slots": [{ "name": "item", "label": "物品", "type": "text", "required": false }],
-      "knowledgeTags": ["办公用品", "领用"],
-      "examples": ["想领两包打印纸"]
-    },
-    {
-      "id": "admin.business_travel",
-      "domain": "ADMIN",
-      "label": "出差 / 订票",
-      "skill": "admin.facility",
-      "keywords": ["出差", "订票", "机票", "高铁", "酒店", "行程"],
-      "patterns": ["(出差|订票|机票|高铁票|酒店).*(申请|订|流程|标准)"],
-      "slots": [
-        { "name": "city", "label": "目的地", "type": "text", "required": false },
-        { "name": "startDate", "label": "出发日期", "type": "date", "required": false }
-      ],
-      "knowledgeTags": ["出差", "订票"],
-      "examples": ["下周去北京出差，怎么订票"]
-    },
-    {
-      "id": "admin.seat",
-      "domain": "ADMIN",
-      "label": "工位 / 搬迁",
-      "skill": "admin.facility",
-      "keywords": ["工位", "座位", "换工位", "搬迁", "储物柜"],
-      "patterns": ["(工位|座位|储物柜).*(申请|调整|换|搬)"],
+      "label": "门禁卡 / 工牌",
+      "skill": "knowledge.qa",
+      "keywords": ["门禁", "门禁卡", "工牌", "厂牌", "刷卡", "补办", "卡丢了", "临时卡"],
+      "patterns": ["(门禁|门禁卡|工牌|厂牌|临时卡).*(怎么|申请|补办|丢|坏|开通)"],
       "slots": [],
-      "knowledgeTags": ["工位", "行政"],
-      "examples": ["想申请换个工位"]
+      "knowledgeTags": ["门禁", "工牌"],
+      "examples": ["门禁卡丢了怎么办", "工牌怎么补办"]
+    },
+    {
+      "id": "admin.supplies_seat",
+      "domain": "ADMIN",
+      "label": "工位 / 办公用品",
+      "skill": "knowledge.qa",
+      "keywords": ["办公用品", "领用", "打印纸", "文具", "工位", "座位", "换工位", "储物柜"],
+      "patterns": ["(办公用品|打印纸|笔|本子|文具).*(领|申请|要|流程)", "(工位|座位|储物柜).*(申请|调整|换|搬|流程)"],
+      "slots": [{ "name": "item", "label": "物品或资源", "type": "text", "required": false }],
+      "knowledgeTags": ["办公用品", "工位", "行政"],
+      "examples": ["办公用品怎么领", "想申请换个工位"]
+    },
+    {
+      "id": "hr.leave_policy",
+      "domain": "HR",
+      "label": "年假 / 假期规则",
+      "skill": "knowledge.qa",
+      "keywords": ["年假", "假期", "调休", "病假", "婚假", "产假", "陪产假", "几天", "多少天", "怎么算"],
+      "patterns": ["(年假|病假|婚假|产假|陪产假|调休).*(多少|几天|规定|怎么算|政策|标准)"],
+      "negativeKeywords": ["提交", "帮我请", "想请", "要请", "我请", "申请"],
+      "slots": [{ "name": "leaveType", "label": "假期类型", "type": "enum", "required": false, "options": ["年假", "病假", "事假", "调休", "婚假", "产假", "陪产假"] }],
+      "knowledgeTags": ["年假", "假期", "考勤"],
+      "examples": ["年假怎么算", "我有多少天年假", "婚假能休几天"]
+    },
+    {
+      "id": "hr.leave_apply",
+      "domain": "HR",
+      "label": "请假流程入口",
+      "skill": "hr.flow_entry",
+      "keywords": ["请假", "休假", "调休", "帮我请", "提交请假", "休年假", "申请假期"],
+      "patterns": ["(帮我|我要|我想|想|申请).*(请假|休假|请年假|调休)", "(下周|明天|后天|\\d+月\\d+[日号]).*(请|休).*假"],
+      "slots": [
+        { "name": "leaveType", "label": "假期类型", "type": "enum", "required": false, "options": ["年假", "病假", "事假", "调休", "婚假", "产假", "陪产假"] },
+        { "name": "startDate", "label": "开始日期", "type": "date", "required": false },
+        { "name": "days", "label": "天数", "type": "days", "required": false }
+      ],
+      "knowledgeTags": ["请假", "年假", "审批"],
+      "examples": ["我想请假", "帮我请 3 天年假"]
+    },
+    {
+      "id": "fin.reimburse_policy",
+      "domain": "FINANCE",
+      "label": "报销标准",
+      "skill": "knowledge.qa",
+      "keywords": ["报销标准", "报销制度", "能不能报", "可以报销吗", "发票要求", "差旅标准", "住宿标准", "打车"],
+      "patterns": ["(能|可以|可否).*(报销|报)", "(报销|差旅|住宿|餐补|打车).*(标准|规定|上限|额度)"],
+      "negativeKeywords": ["提交报销", "帮我报", "我要报销"],
+      "slots": [{ "name": "category", "label": "费用类别", "type": "enum", "required": false, "options": ["差旅", "交通", "住宿", "餐饮", "办公用品", "招待", "培训"] }],
+      "knowledgeTags": ["报销", "差旅", "标准"],
+      "examples": ["报销标准是什么", "出差住宿一晚能报多少", "打车费能报销吗"]
+    },
+    {
+      "id": "fin.reimburse_submit",
+      "domain": "FINANCE",
+      "label": "报销流程入口",
+      "skill": "finance.flow_entry",
+      "keywords": ["提交报销", "帮我报销", "我要报销", "报销单", "走报销", "贴发票"],
+      "patterns": ["(帮我|我要|想).*(报销|提报销|走报销)", "报销.*(\\d+).*(元|块|万)"],
+      "slots": [
+        { "name": "amount", "label": "报销金额", "type": "amount", "required": false },
+        { "name": "category", "label": "费用类别", "type": "enum", "required": false, "options": ["差旅", "交通", "住宿", "餐饮", "办公用品", "招待", "培训"] }
+      ],
+      "knowledgeTags": ["报销", "审批"],
+      "examples": ["我要报销", "帮我提交一笔 1200 元的差旅报销"]
     }
   ]
 }

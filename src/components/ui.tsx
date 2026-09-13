@@ -1,8 +1,6 @@
 import type { ReactNode } from 'react';
-import type { ApprovalStatus, Domain, RiskLevel, TicketStatus } from '@/lib/types';
+import type { Domain, RiskLevel, TicketStatus } from '@/lib/types';
 import {
-  APPROVAL_STATUS_CLASS,
-  APPROVAL_STATUS_LABEL,
   DOMAIN_CLASS,
   DOMAIN_LABEL,
   RISK_CLASS,
@@ -35,10 +33,6 @@ export function TicketStatusBadge({ status }: { status: TicketStatus }) {
   return <span className={cn('chip', TICKET_STATUS_CLASS[status])}>{TICKET_STATUS_LABEL[status]}</span>;
 }
 
-export function ApprovalStatusBadge({ status }: { status: ApprovalStatus }) {
-  return <span className={cn('chip', APPROVAL_STATUS_CLASS[status])}>{APPROVAL_STATUS_LABEL[status]}</span>;
-}
-
 export function PageHeader({
   title,
   description,
@@ -49,12 +43,15 @@ export function PageHeader({
   actions?: ReactNode;
 }) {
   return (
-    <header className="mb-6 flex flex-wrap items-end justify-between gap-4">
-      <div>
-        <h1 className="text-xl font-semibold text-ink">{title}</h1>
-        <p className="mt-1 max-w-3xl text-sm leading-relaxed text-ink-muted">{description}</p>
+    <header className="mb-6 overflow-hidden rounded-2xl border border-[#dbe5ff] bg-white shadow-[0_18px_42px_rgba(51,112,255,0.08)]">
+      <div className="h-1 bg-[linear-gradient(90deg,#3370ff,#7c3aed,#14b8a6)]" />
+      <div className="flex flex-wrap items-end justify-between gap-4 px-5 py-5">
+        <div>
+          <h1 className="text-2xl font-semibold text-[#172033]">{title}</h1>
+          <p className="mt-2 max-w-4xl text-sm leading-relaxed text-[#5f6f89]">{description}</p>
+        </div>
+        {actions ? <div className="flex flex-wrap items-center gap-2">{actions}</div> : null}
       </div>
-      {actions ? <div className="flex flex-wrap items-center gap-2">{actions}</div> : null}
     </header>
   );
 }
@@ -73,16 +70,23 @@ export function StatCard({
   footer?: ReactNode;
 }) {
   const toneClass = {
-    default: 'text-ink',
+    default: 'text-[#172033]',
     good: 'text-emerald-600',
     warn: 'text-amber-600',
     bad: 'text-red-600',
   }[tone];
+  const glowClass = {
+    default: 'from-[#3370ff]/10',
+    good: 'from-emerald-400/12',
+    warn: 'from-amber-400/14',
+    bad: 'from-red-400/14',
+  }[tone];
   return (
-    <div className="card-pad">
-      <div className="label">{label}</div>
-      <div className={cn('mt-2 text-2xl font-semibold tabular-nums', toneClass)}>{value}</div>
-      {hint ? <div className="mt-1 text-xs text-ink-faint">{hint}</div> : null}
+    <div className={cn('relative overflow-hidden rounded-2xl border border-[#dbe5ff] bg-white p-5 shadow-[0_14px_34px_rgba(51,112,255,0.08)]')}>
+      <div className={cn('absolute inset-x-0 top-0 h-1 bg-gradient-to-r to-transparent', glowClass)} />
+      <div className="text-xs font-medium text-[#64748b]">{label}</div>
+      <div className={cn('mt-2 text-3xl font-semibold tabular-nums', toneClass)}>{value}</div>
+      {hint ? <div className="mt-1 text-xs font-medium text-[#71819a]">{hint}</div> : null}
       {footer ? <div className="mt-3">{footer}</div> : null}
     </div>
   );

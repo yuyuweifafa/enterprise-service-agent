@@ -150,12 +150,14 @@ export interface SkillDef {
   domain: Domain;
   description: string;
   baseRisk: RiskLevel;
-  defaultAction: 'answer' | 'create_ticket' | 'human_review' | 'handoff';
+  defaultAction: 'answer' | 'flow_entry' | 'human_review' | 'handoff';
   tools: string[];
   knowledgeRequired: boolean;
   handoffTeam: string;
   /** 规则引擎（engine=mock）用的回复骨架，支持 {{answer}} {{ticketId}} 等占位符 */
   replyTemplate: string;
+  /** 大模型（engine=llm）用的独立 Skill prompt 文件，相对 config/ 目录 */
+  promptFile?: string;
   /** 大模型（engine=llm）用的 Skill 级追加指令。这里写「这类诉求回复时要注意什么」 */
   prompt?: string;
 }
@@ -356,11 +358,17 @@ function loadBundle(): ConfigBundle {
 
   const systemPrompt = readPrompt('system-prompt.md');
   const intentPrompt = readPrompt('intent-prompt.md');
+  const skills = readJson<SkillsConfig>('agent-skills.json');
+  skills.skills = skills.skills.map((skill) => {
+    if (!skill.promptFile) return skill;
+    const filePrompt = readPrompt(skill.promptFile);
+    return filePrompt ? { ...skill, prompt: filePrompt } : skill;
+  });
 
   return {
     app,
     intents: readJson<IntentRulesConfig>('intent-rules.json'),
-    skills: readJson<SkillsConfig>('agent-skills.json'),
+    skills,
     risk: readJson<RiskRulesConfig>('risk-rules.json'),
     tools: readJson<ToolRegistryConfig>('tool-registry.json'),
     systemPrompt,

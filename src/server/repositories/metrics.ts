@@ -1,6 +1,5 @@
 import type {
   AgentLog,
-  Approval,
   Domain,
   KnowledgeGap,
   MetricsSummary,
@@ -17,8 +16,8 @@ interface DailyRow {
   autoResolved: number;
   knowledgeHit: number;
   escalated: number;
-  ticketsCreated: number;
-  approvalsCreated: number;
+  flowEntries: number;
+  humanHandoffs: number;
   avgLatencyMs: number;
   byDomain: Record<string, number>;
 }
@@ -28,6 +27,35 @@ interface MetricsHistoryFile {
 }
 
 const DOMAINS: Domain[] = ['IT', 'HR', 'FINANCE', 'ADMIN', 'UNKNOWN'];
+const CURRENT_INTENT_IDS = new Set([
+  'companion.work_chat',
+  'agent.goal_customer_review',
+  'it.account_login',
+  'it.vpn_access',
+  'it.device_issue',
+  'admin.meeting_room',
+  'admin.access_card',
+  'admin.supplies_seat',
+  'hr.leave_policy',
+  'hr.leave_apply',
+  'fin.reimburse_policy',
+  'fin.reimburse_submit',
+]);
+const LEGACY_CURRENT_LABELS = new Set([
+  '账号密码重置',
+  '电脑登录问题',
+  'VPN / 远程访问权限申请',
+  '设备故障报修',
+  '会议室 / 场地',
+  '门禁卡 / 工牌',
+  '办公用品领用',
+  '假期制度咨询',
+  '请假 / 调休申请',
+  '报销制度咨询',
+  '提交报销单',
+  '客户评审准备工作流',
+  '客户评审准备目标',
+]);
 
 function emptyRow(date: string): DailyRow {
   return {
@@ -36,8 +64,8 @@ function emptyRow(date: string): DailyRow {
     autoResolved: 0,
     knowledgeHit: 0,
     escalated: 0,
-    ticketsCreated: 0,
-    approvalsCreated: 0,
+    flowEntries: 0,
+    humanHandoffs: 0,
     avgLatencyMs: 0,
     byDomain: { IT: 0, HR: 0, FINANCE: 0, ADMIN: 0, UNKNOWN: 0 },
   };
@@ -48,6 +76,14 @@ function percentile(values: number[], p: number): number {
   const sorted = [...values].sort((a, b) => a - b);
   const idx = Math.min(sorted.length - 1, Math.max(0, Math.ceil((p / 100) * sorted.length) - 1));
   return sorted[idx];
+}
+
+function isCurrentScopeLog(log: AgentLog): boolean {
+  if (log.kind === 'out_of_scope') return false;
+  if (log.kind === 'smalltalk') return true;
+  const intent = log.intents[0];
+  if (!intent) return false;
+  return CURRENT_INTENT_IDS.has(intent.id ?? '') || LEGACY_CURRENT_LABELS.has(intent.label);
 }
 
 /**
@@ -66,11 +102,10 @@ export async function computeMetrics(days = 14): Promise<MetricsSummary> {
   // 闲聊与域外请求都不算服务请求。前者会刷高解决率，后者（天气、写代码）
   // 根本不是服务台该处理的事，算进去等于把「拒答」也统计成「服务」。
   const logs = cfg.excludeSmallTalkFromMetrics
-    ? allLogs.filter((l) => l.kind !== 'smalltalk' && l.kind !== 'out_of_scope')
-    : allLogs;
+    ? allLogs.filter((l) => isCurrentScopeLog(l) && l.kind !== 'smalltalk' && l.kind !== 'out_of_scope')
+    : allLogs.filter(isCurrentScopeLog);
   const smallTalkCount = allLogs.length - logs.length;
   const tickets = await readCollection<Ticket>('tickets');
-  const approvals = await readCollection<Approval>('approvals');
   const gaps = await readCollection<KnowledgeGap>('knowledge-gaps');
 
   // ── 1. 合并每日聚合 ────────────────────────────────────────────────────
@@ -88,6 +123,16 @@ export async function computeMetrics(days = 14): Promise<MetricsSummary> {
     if (log.knowledgeHit) row.knowledgeHit += 1;
     if (log.escalated) row.escalated += 1;
     const primaryDomain = log.intents[0]?.domain ?? 'UNKNOWN';
+    const primaryIntent = log.intents[0]?.id ?? '';
+    if ((primaryDomain === 'IT' || primaryDomain === 'ADMIN') && (log.escalated || log.feedback === 'down')) {
+      row.humanHandoffs += 1;
+    }
+    if (
+      (primaryDomain === 'HR' && primaryIntent === 'hr.leave_apply') ||
+      (primaryDomain === 'FINANCE' && primaryIntent === 'fin.reimburse_submit')
+    ) {
+      row.flowEntries += 1;
+    }
     row.byDomain[primaryDomain] = (row.byDomain[primaryDomain] ?? 0) + 1;
     buckets.set(date, row);
 
@@ -99,14 +144,8 @@ export async function computeMetrics(days = 14): Promise<MetricsSummary> {
   for (const t of tickets) {
     const date = t.createdAt.slice(0, 10);
     const row = buckets.get(date);
-    if (row && t.source === 'AGENT') row.ticketsCreated += 1;
+    if (row && t.source === 'AGENT') row.flowEntries += 1;
   }
-  for (const a of approvals) {
-    const date = a.createdAt.slice(0, 10);
-    const row = buckets.get(date);
-    if (row) row.approvalsCreated += 1;
-  }
-
   // 用实时日志修正当日平均耗时
   for (const [date, arr] of liveLatency) {
     const row = buckets.get(date);
@@ -129,16 +168,16 @@ export async function computeMetrics(days = 14): Promise<MetricsSummary> {
       autoResolved: acc.autoResolved + r.autoResolved,
       escalated: acc.escalated + r.escalated,
       knowledgeHit: acc.knowledgeHit + r.knowledgeHit,
-      ticketsCreated: acc.ticketsCreated + r.ticketsCreated,
-      approvalsCreated: acc.approvalsCreated + r.approvalsCreated,
+      flowEntries: acc.flowEntries + r.flowEntries,
+      humanHandoffs: acc.humanHandoffs + r.humanHandoffs,
     }),
     {
       conversations: 0,
       autoResolved: 0,
       escalated: 0,
       knowledgeHit: 0,
-      ticketsCreated: 0,
-      approvalsCreated: 0,
+      flowEntries: 0,
+      humanHandoffs: 0,
     },
   );
 
@@ -242,7 +281,7 @@ export async function computeMetrics(days = 14): Promise<MetricsSummary> {
     })),
     byDomain,
     riskDistribution,
-    ticketStatus: (Object.keys(statusCounts) as TicketStatus[]).map((status) => ({
+    handoffStatus: (Object.keys(statusCounts) as TicketStatus[]).map((status) => ({
       status,
       count: statusCounts[status],
     })),
@@ -257,7 +296,10 @@ export async function computeMetrics(days = 14): Promise<MetricsSummary> {
         occurrences: g.occurrences,
         status: g.status,
       })),
-    pendingReview: approvals.filter((a) => a.status === 'PENDING').length,
+    pendingReview: logs.filter((l) => {
+      const domain = l.intents[0]?.domain ?? 'UNKNOWN';
+      return (domain === 'IT' || domain === 'ADMIN') && (l.escalated || l.feedback === 'down');
+    }).length,
     smallTalkExcluded: smallTalkCount,
   };
 }

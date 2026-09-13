@@ -1,7 +1,7 @@
 'use client';
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
-import type { Employee } from '@/lib/types';
+import type { Domain, Employee } from '@/lib/types';
 import { apiGet } from '@/lib/client';
 
 /**
@@ -9,7 +9,7 @@ import { apiGet } from '@/lib/client';
  *
  * 刻意区分两种身份，因为这是两个不同的角色（也是两侧产品的分界）：
  *   - employee：员工端（/chat）的「我是谁」，决定档案、权限、风险规则命中情况
- *   - staff：服务台后台（/console/*）的「处理人是谁」，写进工单时间线与审批记录
+ *   - staff：服务后台（/console/*）的「处理人是谁」，写进人工接入记录
  *
  * 真实项目里这两者来自同一套 SSO，但走不同的授权：
  * 员工只能看自己的工单，服务台同事按团队看队列。这里用两个下拉框模拟。
@@ -18,16 +18,15 @@ import { apiGet } from '@/lib/client';
 export interface StaffIdentity {
   name: string;
   team: string;
+  domain: Extract<Domain, 'IT' | 'ADMIN'>;
 }
 
 /** 演示用的服务台同事名单，对应 mock 数据里的处理团队 */
 export const STAFF_PRESETS: StaffIdentity[] = [
-  { name: '程一', team: '安全与合规组' },
-  { name: '王磊', team: 'IT 权限管理组' },
-  { name: '刘颖', team: 'IT 桌面运维' },
-  { name: '苏雨', team: 'HRBP' },
-  { name: '梁菁', team: '财务共享中心' },
-  { name: '钱佳', team: '行政前台' },
+  { name: '王磊', team: 'IT 权限管理组', domain: 'IT' },
+  { name: '刘颖', team: 'IT 桌面运维', domain: 'IT' },
+  { name: '钱佳', team: '行政前台', domain: 'ADMIN' },
+  { name: '周宁', team: '行政设施组', domain: 'ADMIN' },
 ];
 
 interface IdentityValue {
@@ -62,7 +61,8 @@ export function IdentityProvider({ children }: { children: React.ReactNode }) {
     if (savedStaff) {
       try {
         const parsed = JSON.parse(savedStaff) as StaffIdentity;
-        if (parsed?.name) setStaffState(parsed);
+        const valid = STAFF_PRESETS.find((s) => s.name === parsed?.name && s.team === parsed?.team);
+        if (valid) setStaffState(valid);
       } catch {
         // 存的内容坏了就用默认值
       }

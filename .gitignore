@@ -12,6 +12,7 @@ next-env.d.ts
 
 # 运行时可写数据（工单/审批/日志/未命中沉淀），由 data/seed 自动初始化
 data/runtime/
+tmp/
 
 .DS_Store
 *.log

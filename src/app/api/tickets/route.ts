@@ -1,8 +1,6 @@
-import { z } from 'zod';
 import type { Domain, RiskLevel, TicketStatus } from '@/lib/types';
-import { ok, parseBody, withErrorHandling } from '@/server/http';
-import { createTicket, listTickets } from '@/server/repositories/tickets';
-import { getEmployee } from '@/server/repositories/employees';
+import { fail, ok, withErrorHandling } from '@/server/http';
+import { listTickets } from '@/server/repositories/tickets';
 
 /** GET /api/tickets?domain=IT&status=OPEN&riskLevel=HIGH&q=vpn */
 export const GET = withErrorHandling(async (req: Request) => {
@@ -17,30 +15,8 @@ export const GET = withErrorHandling(async (req: Request) => {
   return ok(tickets, { total: tickets.length });
 });
 
-const createSchema = z.object({
-  employeeId: z.string().min(1),
-  domain: z.enum(['IT', 'HR', 'FINANCE', 'ADMIN', 'UNKNOWN']),
-  intentId: z.string().nullable().optional(),
-  title: z.string().min(1).max(200),
-  description: z.string().min(1).max(4000),
-  riskLevel: z.enum(['LOW', 'MEDIUM', 'HIGH']).default('MEDIUM'),
-  assigneeTeam: z.string().optional(),
-  source: z.enum(['AGENT', 'HUMAN']).default('HUMAN'),
-  slots: z.record(z.string(), z.unknown()).optional(),
-  citations: z
-    .array(z.object({ docId: z.string(), title: z.string(), section: z.string() }))
-    .optional(),
-});
-
-/** POST /api/tickets — 创建工单（对应工具 ticket.create） */
+/** POST /api/tickets — 当前收敛版不再支持自动创建工单 */
 export const POST = withErrorHandling(async (req: Request) => {
-  const parsed = await parseBody(req, createSchema);
-  if (!parsed.ok) return parsed.response;
-  const employee = await getEmployee(parsed.data.employeeId);
-  const ticket = await createTicket({
-    ...parsed.data,
-    intentId: parsed.data.intentId ?? null,
-    employeeName: employee?.name ?? '未知员工',
-  });
-  return ok(ticket, undefined, 201);
+  await req.text();
+  return fail('TICKET_CREATE_DISABLED', '当前 Demo 不再自动创建工单，请使用对话记录和 IT / 行政人工接入。', 410);
 });

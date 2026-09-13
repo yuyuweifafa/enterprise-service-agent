@@ -1,110 +1,47 @@
 {
-  "$comment": "风险分级规则。判定流程：Skill.baseRisk 作为初始等级 → 按顺序评估 rules，命中则按 effect 调整等级并记录 reason → 取最终等级对应的动作集。when 支持的条件见 src/agent/risk.ts 中的 evaluateCondition。",
-  "version": "0.1.0",
+  "$comment": "当前 Demo 的风险规则只服务收敛后的个人工作助手：不自动创建任务，不展开 HR/财务人工后台。",
+  "version": "0.2.0",
   "levels": {
     "LOW": {
       "label": "低风险",
-      "policy": "自动答复",
-      "description": "纯信息咨询，答错的代价可接受，直接回复并附来源。",
+      "policy": "直接回复",
+      "description": "闲聊陪伴、制度说明、普通操作指引，直接回复并展示依据。",
       "actions": ["answer"]
     },
     "MEDIUM": {
       "label": "中风险",
-      "policy": "自动建单",
-      "description": "需要落地执行但不涉及资金、数据与人事敏感面，自动创建工单交对应团队。",
-      "actions": ["answer", "create_ticket"]
+      "policy": "谨慎回复 / 可转人工",
+      "description": "客户评审准备、知识库未命中、意图不确定等情况，先说明已知结论，必要时转 IT/行政人工。",
+      "actions": ["answer"]
     },
     "HIGH": {
       "label": "高风险",
-      "policy": "人工确认",
-      "description": "涉及生产数据、资金支付、权限提升或人事敏感事项，Agent 只输出建议，必须人工确认后才可执行。",
-      "actions": ["answer", "create_ticket", "create_approval", "handoff"]
+      "policy": "不自动处理",
+      "description": "当前 Demo 不展开高风险办理，只提示超出范围或回到企业既有流程。",
+      "actions": ["answer", "handoff"]
     }
   },
   "rules": [
-    {
-      "id": "R001",
-      "name": "生产环境与高权限关键词",
-      "when": { "keywordsAny": ["生产环境", "生产库", "线上库", "生产数据", "root", "sudo", "超级管理员", "管理员权限", "提权", "堡垒机"] },
-      "effect": { "setLevel": "HIGH" },
-      "reason": "命中生产环境 / 特权账号关键词，按最小权限原则须人工审批"
-    },
-    {
-      "id": "R002",
-      "name": "批量数据导出",
-      "when": { "keywordsAny": ["批量导出", "全量导出", "全部导出", "导出全部", "客户名单", "全量数据", "拖库", "下载所有"] },
-      "effect": { "setLevel": "HIGH" },
-      "reason": "涉及批量数据导出，存在数据泄露风险，须数据安全组确认"
-    },
-    {
-      "id": "R003",
-      "name": "人事敏感事项",
-      "when": { "intentIn": ["hr.salary_inquiry", "hr.offboarding"] },
-      "effect": { "setLevel": "HIGH" },
-      "reason": "薪酬 / 离职属人事敏感事项，须 HRBP 一对一处理"
-    },
-    {
-      "id": "R004",
-      "name": "裁员与劳动争议",
-      "when": { "keywordsAny": ["裁员", "辞退", "劳动仲裁", "N+1", "赔偿金", "投诉上级", "举报"] },
-      "effect": { "setLevel": "HIGH" },
-      "reason": "命中劳动关系争议关键词，须 HR 与法务介入"
-    },
-    {
-      "id": "R005",
-      "name": "报销金额超过自动通道上限",
-      "when": { "intentIn": ["fin.reimburse_submit"], "amountGte": 5000 },
-      "effect": { "setLevel": "HIGH" },
-      "reason": "报销金额 ≥ 5000 元，超出自动受理上限，须财务复核"
-    },
-    {
-      "id": "R006",
-      "name": "资金支付类事项",
-      "when": { "intentIn": ["fin.budget_approval"] },
-      "effect": { "setLevel": "HIGH" },
-      "reason": "涉及对外付款 / 预算外支出，须财务负责人审批"
-    },
-    {
-      "id": "R007",
-      "name": "大额金额兜底",
-      "when": { "amountGte": 50000 },
-      "effect": { "setLevel": "HIGH" },
-      "reason": "单笔金额 ≥ 50000 元，触发大额兜底规则"
-    },
-    {
-      "id": "R008",
-      "name": "长假期申请",
-      "when": { "intentIn": ["hr.leave_apply"], "daysGte": 10 },
-      "effect": { "setLevel": "HIGH" },
-      "reason": "连续请假 ≥ 10 天，须上级与 HR 双重确认"
-    },
-    {
-      "id": "R009",
-      "name": "试用期员工的权限申请",
-      "when": { "employeeStatusIn": ["PROBATION"], "skillIn": ["it.access_request", "it.privileged_access"] },
-      "effect": { "escalate": 1 },
-      "reason": "试用期员工申请系统权限，风险等级上调一级"
-    },
     {
       "id": "R010",
       "name": "知识库未命中",
       "when": { "noKnowledgeHit": true },
       "effect": { "minLevel": "MEDIUM" },
-      "reason": "知识库无可引用依据，不做自动答复，转人工并沉淀知识缺口"
+      "reason": "知识库无可引用依据，不编造答案，记录知识缺口"
     },
     {
       "id": "R011",
       "name": "意图识别置信度过低",
       "when": { "confidenceLt": 0.35 },
       "effect": { "minLevel": "MEDIUM" },
-      "reason": "意图置信度低于 0.35，避免误执行，转人工确认"
+      "reason": "意图置信度低于 0.35，避免误执行"
     },
     {
       "id": "R012",
-      "name": "必填槽位缺失",
+      "name": "必填信息缺失",
       "when": { "missingRequiredSlot": true, "currentLevelIn": ["LOW", "MEDIUM"] },
       "effect": { "setLevel": "LOW", "forceAction": "clarify" },
-      "reason": "关键信息缺失，先向员工追问而不是直接建单"
+      "reason": "关键信息缺失，先向员工追问"
     }
   ],
   "escalationOrder": ["LOW", "MEDIUM", "HIGH"]

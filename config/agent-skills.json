@@ -1,207 +1,96 @@
 {
-  "$comment": "Agent Skill 定义：一个 Skill = 一类诉求的处理套路（用什么知识、调什么工具、默认动作、回复骨架、兜底团队）。新增业务能力时在此追加一个 Skill，并在 intent-rules.json 里把意图挂到它上面。",
-  "version": "0.2.0",
+  "$comment": "Agent Skill 定义。当前 Demo 收敛为 4 类：闲聊/工作陪伴、知识库问答、客户评审准备、IT/行政转人工。HR/财务只给既有流程入口，不进入人工后台。",
+  "version": "0.3.0",
   "skills": [
     {
-      "id": "it.self_service",
-      "name": "IT 自助服务",
-      "domain": "IT",
-      "description": "密码重置、账号解锁等可由员工自助完成的操作，以知识指引为主，不产生工单。",
+      "id": "companion.work",
+      "name": "闲聊与工作陪伴",
+      "domain": "UNKNOWN",
+      "description": "员工表达情绪、压力、会前紧张、希望整理当天优先级，或只是随口闲聊、打趣、夸奖、感谢时，由大模型自然回应，不调用企业接口。",
       "baseRisk": "LOW",
       "defaultAction": "answer",
-      "tools": [
-        "kb.search",
-        "hr.get_employee"
-      ],
-      "knowledgeRequired": true,
-      "handoffTeam": "IT Helpdesk",
-      "replyTemplate": "{{answer}}\n\n如果按上述步骤仍未解决，回复「转人工」，我会为你创建工单并转 IT 值班同事。",
-      "prompt": "这类问题员工自己就能解决，重点是把操作步骤讲清楚：入口在哪、几步、大概多久。不要建议他提交工单。步骤末尾提示一句「按步骤仍未解决可以回复转人工」。"
-    },
-    {
-      "id": "it.access_request",
-      "name": "IT 权限与资产申请",
-      "domain": "IT",
-      "description": "VPN、软件授权等常规权限申请，需要走工单与系统开通。",
-      "baseRisk": "MEDIUM",
-      "defaultAction": "create_ticket",
-      "tools": [
-        "kb.search",
-        "it.get_permissions",
-        "ticket.create"
-      ],
-      "knowledgeRequired": true,
-      "handoffTeam": "IT 权限管理组",
-      "replyTemplate": "{{answer}}\n\n已为你创建工单 {{ticketId}}，当前状态 {{ticketStatus}}，预计 {{sla}} 内响应。",
-      "prompt": "说明三件事：需不需要上级审批、大概多久开通、开通后怎么拿到配置。如果查到员工当前已有该权限或权限已过期，要点出来（比如「你的 VPN 已于 X 年 X 月到期，这次按续期处理」）。"
-    },
-    {
-      "id": "it.incident",
-      "name": "IT 故障处理",
-      "domain": "IT",
-      "description": "设备/系统故障报修，先给自查步骤，同时建单跟踪。",
-      "baseRisk": "MEDIUM",
-      "defaultAction": "create_ticket",
-      "tools": [
-        "kb.search",
-        "ticket.create"
-      ],
-      "knowledgeRequired": true,
-      "handoffTeam": "IT 桌面运维",
-      "replyTemplate": "{{answer}}\n\n已同步创建报修工单 {{ticketId}}，工程师会主动联系你。",
-      "prompt": "先给 2~3 条员工自己能试的自查动作，再说工单已建。如果制度片段里写了故障等级对应的响应时限和备机策略，要带上。不要承诺具体修好时间。"
-    },
-    {
-      "id": "it.privileged_access",
-      "name": "特权访问审批",
-      "domain": "IT",
-      "description": "生产环境、数据库、批量数据导出等高危权限，一律人工确认，Agent 只给建议不执行。",
-      "baseRisk": "HIGH",
-      "defaultAction": "human_review",
-      "tools": [
-        "kb.search",
-        "it.get_permissions",
-        "ticket.create",
-        "approval.create"
-      ],
-      "knowledgeRequired": true,
-      "handoffTeam": "安全与合规组",
-      "replyTemplate": "这类权限涉及生产数据安全，我不能直接开通。\n\n{{answer}}\n\n已生成人工确认任务 {{approvalId}}，安全与合规组会在 1 小时内处理。",
-      "prompt": "开头必须明确「我不能直接为你开通」。然后：① 说明为什么需要审批（引用制度）；② 如果制度片段里提到了替代方案（比如数仓脱敏视图、日志平台、数据变更单），优先推荐替代方案并说明它能覆盖什么场景；③ 最后说审批链路和有效期。语气专业、不推诿，不要说「这是规定」这种话。"
-    },
-    {
-      "id": "hr.policy_qa",
-      "name": "HR 制度问答",
-      "domain": "HR",
-      "description": "假期、社保、入职转正等制度类咨询，以知识库引用回答为主。",
-      "baseRisk": "LOW",
-      "defaultAction": "answer",
-      "tools": [
-        "kb.search",
-        "hr.get_employee"
-      ],
-      "knowledgeRequired": true,
-      "handoffTeam": "HRBP",
+      "tools": [],
+      "knowledgeRequired": false,
+      "handoffTeam": "不转人工",
       "replyTemplate": "{{answer}}",
-      "prompt": "假期、社保这类问题员工最关心「我自己的情况是多少」。如果档案里有相关数字（年假余额、司龄、入职日期），结合着说。制度表格分档位时，先说清他属于哪一档的判断依据，判断不了就列出档位让他对照。"
+      "prompt": "这类请求不是制度问答，也不是工单。像一个靠谱、轻松的工作搭子一样回应：如果是夸奖、打趣、问候、感谢或无意义闲话，简单自然地接 1 到 2 句，不要硬拽回制度或工单；如果是情绪或压力，先接住情绪，再帮员工把下一步拆清楚。不要说已查询系统、已建单、已转人工。"
     },
     {
-      "id": "hr.transaction",
-      "name": "HR 事务办理",
-      "domain": "HR",
-      "description": "请假、调休等需要落库并走审批的事务，槽位不全时先追问。",
-      "baseRisk": "MEDIUM",
-      "defaultAction": "create_ticket",
-      "tools": [
-        "kb.search",
-        "hr.get_employee",
-        "ticket.create"
-      ],
+      "id": "knowledge.qa",
+      "name": "知识库问答",
+      "domain": "UNKNOWN",
+      "description": "VPN、电脑登录、会议室、门禁卡、报销标准、年假规则等可标准化回答的问题，统一先查知识库。",
+      "baseRisk": "LOW",
+      "defaultAction": "answer",
+      "tools": ["kb.search", "hr.get_employee"],
       "knowledgeRequired": true,
-      "handoffTeam": "HR 共享服务",
-      "replyTemplate": "{{answer}}\n\n已生成事务工单 {{ticketId}}，将同步给你的直属上级 {{manager}} 审批。",
-      "prompt": "确认已受理，并说明后续审批经过谁、大概多久。如果制度对天数有额外要求（比如连续 N 天以上需要额外会签、需要交接说明），要提醒。"
+      "handoffTeam": "按问题归属转 IT / 行政",
+      "replyTemplate": "{{answer}}\n\n如果这没有解决，IT / 行政类问题可以点「没用，转人工」，我会把这段对话和已查依据同步给对应同事。",
+      "promptFile": "skills/knowledge-qa-flow/SKILL.md",
+      "prompt": "只回答知识库能支撑的内容。先给结论，再给 2~3 步操作或规则要点。没有依据时必须明确说明没有找到明确制度依据，不要凭常识编答案。HR/财务办理类事项只引导去公司既有流程入口。"
     },
     {
-      "id": "hr.sensitive",
-      "name": "HR 敏感事项",
-      "domain": "HR",
-      "description": "薪酬、绩效、离职等敏感事项，不在对话中透露细节，转 HRBP 人工。",
-      "baseRisk": "HIGH",
-      "defaultAction": "human_review",
+      "id": "agent.customer_review",
+      "name": "客户评审准备",
+      "domain": "UNKNOWN",
+      "description": "唯一做深的个人工作助手场景：根据员工一句目标，模拟查日程、查会议室、搜历史资料、推提醒，并给天气/着装/心态建议。",
+      "baseRisk": "MEDIUM",
+      "defaultAction": "answer",
       "tools": [
         "hr.get_employee",
-        "ticket.create",
-        "approval.create"
+        "calendar.find_slots",
+        "meeting.find_rooms",
+        "docs.search_customer_history",
+        "weather.get_forecast",
+        "meeting.book_room",
+        "reminder.create"
       ],
       "knowledgeRequired": false,
-      "handoffTeam": "HRBP",
-      "replyTemplate": "这类事项涉及个人敏感信息，需要由 HRBP 与你一对一沟通，我不会在这里展开细节。\n\n已生成人工确认任务 {{approvalId}}，{{manager}} 所属 HRBP 会主动联系你。",
-      "prompt": "这类事项不在对话里展开任何细节，也不要输出任何具体数字（薪酬、绩效等级、赔偿金额）。只说三件事：这需要一对一沟通、已转交谁、对方会主动联系。不要追问原因，不要评价员工的诉求。"
-    },
-    {
-      "id": "fin.policy_qa",
-      "name": "财务制度问答",
-      "domain": "FINANCE",
-      "description": "报销标准、发票要求等制度咨询，必须引用制度原文与金额上限。",
-      "baseRisk": "LOW",
-      "defaultAction": "answer",
-      "tools": [
-        "kb.search"
-      ],
-      "knowledgeRequired": true,
-      "handoffTeam": "财务共享中心",
+      "handoffTeam": "按失败节点转 IT / 行政",
       "replyTemplate": "{{answer}}",
-      "prompt": "报销问题必须给出准确金额上限和适用条件，这两个都必须来自制度片段。城市分类、职级档位如果片段里没写清楚对应关系，不要替员工判断属于哪档，列出来让他对照。顺带提醒时限（多少天内提交）和常见的不予报销情形。"
+      "promptFile": "skills/customer-review-prep/SKILL.md",
+      "prompt": "这是个人工作助手的核心演示。必须按“我理解你的目标 → 我拆成哪些任务 → 已完成什么 → 还需要你确认什么 → 会前提醒”来回复。明确展示日程、会议室、历史资料、客户联系提醒、天气/着装/心态建议。不要创建工单，不要说服务编排中台。"
     },
     {
-      "id": "fin.transaction",
-      "name": "报销单据办理",
-      "domain": "FINANCE",
-      "description": "提交报销单，按金额判断审批链路；超过阈值升级为人工确认。",
-      "baseRisk": "MEDIUM",
-      "defaultAction": "create_ticket",
-      "tools": [
-        "kb.search",
-        "hr.get_employee",
-        "ticket.create"
-      ],
-      "knowledgeRequired": true,
-      "handoffTeam": "财务共享中心",
-      "replyTemplate": "{{answer}}\n\n已创建报销工单 {{ticketId}}，请在 3 个工作日内把发票原件贴单交至财务。",
-      "prompt": "说明已受理的金额、审批链路、以及员工接下来要做什么（贴票、交单据、期限）。如果金额接近自动受理上限，提醒一句超过会转人工复核。"
-    },
-    {
-      "id": "fin.high_value",
-      "name": "大额资金事项",
-      "domain": "FINANCE",
-      "description": "预算外支出、对公付款等资金动作，一律人工确认。",
-      "baseRisk": "HIGH",
-      "defaultAction": "human_review",
-      "tools": [
-        "kb.search",
-        "ticket.create",
-        "approval.create"
-      ],
-      "knowledgeRequired": true,
-      "handoffTeam": "财务负责人",
-      "replyTemplate": "涉及资金支付的事项我不能自动提交。\n\n{{answer}}\n\n已生成人工确认任务 {{approvalId}}，请等待财务负责人复核。",
-      "prompt": "开头明确「涉及资金支付我不会自动提交」。然后说明该金额对应的审批链路、需要补齐的材料清单。不要评估这笔支出合理不合理，那是审批人的事。"
-    },
-    {
-      "id": "admin.facility",
-      "name": "行政后勤服务",
-      "domain": "ADMIN",
-      "description": "门禁卡、会议室、办公用品、出差订票、工位等常规行政服务。",
+      "id": "hr.flow_entry",
+      "name": "请假流程入口",
+      "domain": "HR",
+      "description": "请假、调休等 HR 办理事项，只展示去企业既有流程的入口，不进入人工后台。",
       "baseRisk": "LOW",
-      "defaultAction": "answer",
-      "tools": [
-        "kb.search",
-        "ticket.create"
-      ],
+      "defaultAction": "flow_entry",
+      "tools": ["hr.get_employee", "leave.get_balance", "kb.search"],
       "knowledgeRequired": true,
-      "handoffTeam": "行政前台",
-      "replyTemplate": "{{answer}}",
-      "prompt": "行政类问题员工要的是「去哪、找谁、多久、要不要钱」。把这四点说清楚就够了，不用铺垫。涉及工本费、押金、逾期规则的要明确说。"
+      "handoffTeam": "企业既有 HR 流程",
+      "replyTemplate": "{{answer}}\n\n入口：去请假流程。",
+      "prompt": "先结合员工档案说明年假/调休余额，再告诉员工应进入公司既有请假流程。不要转 HR 人工，不要创建工单，不要真的提交审批。"
+    },
+    {
+      "id": "finance.flow_entry",
+      "name": "报销流程入口",
+      "domain": "FINANCE",
+      "description": "报销办理事项，只展示去企业既有财务流程的入口，不进入人工后台。",
+      "baseRisk": "LOW",
+      "defaultAction": "flow_entry",
+      "tools": ["kb.search"],
+      "knowledgeRequired": true,
+      "handoffTeam": "企业既有财务流程",
+      "replyTemplate": "{{answer}}\n\n入口：去报销流程。",
+      "prompt": "如果员工问报销标准，按知识库回答金额、条件和时限。如果员工要提交报销，只提醒去公司既有报销流程，不转财务人工，不创建工单。"
     },
     {
       "id": "fallback.handoff",
-      "name": "兜底转人工",
+      "name": "兜底与知识缺口",
       "domain": "UNKNOWN",
-      "description": "意图无法识别或知识库无命中时使用：如实告知、沉淀知识缺口、转人工。",
+      "description": "属于员工服务范围但未识别或知识库未覆盖时，如实说明、记录知识缺口；只有 IT/行政方向才提示可转人工。",
       "baseRisk": "MEDIUM",
-      "defaultAction": "handoff",
-      "$toolsComment": "knowledgeRequired 必须为 true —— 兜底 Skill 也要真的检索一次，才能知道是「确实没有依据」还是「意图没识别对」，未命中沉淀依赖这个判定。",
-      "tools": [
-        "kb.search",
-        "kb.record_gap",
-        "ticket.create"
-      ],
+      "defaultAction": "answer",
+      "tools": ["kb.search", "kb.record_gap"],
       "knowledgeRequired": true,
-      "handoffTeam": "服务台值班",
-      "replyTemplate": "这个问题我暂时没有找到明确的制度依据，不方便给你一个可能出错的答案。\n\n已记录为待补充知识（{{gapId}}）并转交服务台值班同事（工单 {{ticketId}}）跟进。",
-      "prompt": "明确说没有找到制度依据，不要用「可能」「一般来说」「通常」这类词去填补空白，更不要凭常识编制度内容。告知已转人工并给出工单号。可以顺便说一句这个问题已被记录、后续会补进知识库。"
+      "handoffTeam": "IT / 行政人工",
+      "replyTemplate": "这个问题我暂时没有找到明确的制度依据，不方便给你一个可能出错的答案。\n\n如果这是 IT 或行政问题，可以点「没用，转人工」，对应同事会看到这段对话和小助已经做过的判断。后台同事会再判断它是知识缺口、能力缺口，还是一次性人工处理事项。",
+      "promptFile": "skills/handoff-policy/SKILL.md",
+      "prompt": "明确说没有找到制度依据，不要凭常识补制度。说明已记录知识缺口；只有 IT/行政问题才提示可转人工。HR/财务仍回到既有流程入口。"
     }
   ],
-  "$promptComment": "每个 Skill 的 prompt 字段是「大模型模式下这一类诉求的追加指令」，会拼在 config/system-prompt.md 之后送给模型。replyTemplate 只在规则引擎（AGENT_ENGINE=mock）下生效，两者互不影响。"
+  "$promptComment": "每个 Skill 的 prompt 字段是大模型模式下这一类诉求的追加指令；replyTemplate 是规则引擎和降级时的回复骨架。"
 }

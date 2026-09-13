@@ -66,7 +66,7 @@ function buildTool(intents: IntentRule[], maxIntents: number): LlmToolDef {
         properties: {
           intents: {
             type: 'array',
-            minItems: 1,
+            minItems: 0,
             maxItems: maxIntents,
             description: `拆解出的意图，最多 ${maxIntents} 个。一句话里出现「另外/顺便/还有/同时」等连接词时要考虑拆分。`,
             items: {
@@ -106,7 +106,7 @@ function buildTool(intents: IntentRule[], maxIntents: number): LlmToolDef {
             enum: ['in_scope', 'out_of_scope'],
             description:
               'unmatched=true 时必填，用来区分两种完全不同的情况：' +
-              'in_scope = 属于企业内部服务（IT/HR/财务/行政）范畴，只是意图目录里还没有这一项，例如「海外参展的清关手续」「员工持股计划」——这类要沉淀成待补充知识并转人工；' +
+              'in_scope = 属于企业内部服务（IT/HR/财务/行政）范畴，只是意图目录里还没有这一项，例如「海外参展的清关手续」「员工持股计划」——这类要沉淀成待补充知识；只有 IT/行政可转人工，HR/财务回到流程入口；' +
               'out_of_scope = 根本不属于企业内部服务台的职责，例如查天气、写代码、翻译、股价、推荐餐厅——这类只需说明服务范围，不要建工单也不要记成知识缺口（公司不会为「天气」写制度）。',
           },
         },
@@ -118,7 +118,7 @@ function buildTool(intents: IntentRule[], maxIntents: number): LlmToolDef {
 
 /** 内置兜底 prompt：只在 config/intent-prompt.md 缺失或为空时使用 */
 const FALLBACK_INTENT_PROMPT = [
-  '你是企业内部服务台的意图识别模块，服务 IT / HR / 财务 / 行政四个职能域。',
+  '你是小助的意图识别模块，服务范围是工作陪伴、知识库问答、客户评审准备、IT/行政人工接入，以及 HR/财务流程入口。',
   '任务：把员工的一句话拆成 1 个或多个独立可执行的意图，并抽取每个意图的槽位。',
   '',
   '## 可用意图目录（只能从这里选）',
@@ -201,11 +201,10 @@ export async function recognizeIntentsLlm(
       { role: 'system', content: buildSystemPrompt(catalog, today) },
       { role: 'user', content: text },
     ],
-    tools: [buildTool(intentCfg.intents, app.agent.maxIntentsPerTurn)],
-    forceTool: 'submit_intents',
+    temperature: 0,
   });
 
-  // 有些供应商在 tool_choice 强制下仍可能把 JSON 放进 content，两条路都兜住
+  // 使用纯 JSON content 解析。保留 toolCalls 读取只是为了兼容未来切回 function calling。
   const rawArguments = res.toolCalls[0]?.arguments ?? res.content ?? '';
   const parsed = extractJson(rawArguments) as
     | { intents?: unknown[]; unmatched?: boolean; scope?: string }

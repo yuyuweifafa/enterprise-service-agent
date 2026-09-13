@@ -3,9 +3,9 @@ import './globals.css';
 import { IdentityProvider } from '@/components/identity';
 
 export const metadata: Metadata = {
-  title: '企业内部服务智能体 | IT / HR / 财务 / 行政一站式服务台',
+  title: '禹钰炜作品集 | AI 解决方案产品经理',
   description:
-    '面向员工的企业内部服务 Agent Demo：多意图识别、知识库引用、工单生成、风险分级、人工确认、未命中沉淀与效果看板。',
+    '面向 AI 解决方案产品经理和 AI 产品经理岗位的个人作品集，展示 Agent 产品方案、B 端流程抽象、服务闭环和客户方案表达能力。',
 };
 
 /**

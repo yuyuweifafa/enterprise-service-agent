@@ -34,16 +34,15 @@ import { executeTool, type ToolContext } from './tools';
  *
  * **风险分级、动作编排、工具调用在两种引擎下都是规则驱动的，不交给模型。**
  * 企业内部服务场景要的是可审计、可解释、可回归测试：员工问「这笔钱能不能报」，
- * 答错了要能查出是哪条制度、哪条规则导致的。让模型自由决定要不要开生产库权限，
- * 出问题时无法定位，也没法写回归测试。
+ * 答错了要能查出是哪条制度、哪条规则导致的。当前 Demo 只保留陪伴、知识问答、
+ * 客户评审准备和 IT / 行政人工接入，避免把流程系统都做成一个臃肿后台。
  */
 
 const ACTION_ORDER: Record<AgentActionType, number> = {
   answer: 0,
   clarify: 0,
   record_gap: 1,
-  create_ticket: 2,
-  create_approval: 3,
+  flow_entry: 2,
   handoff: 4,
 };
 
@@ -52,10 +51,18 @@ const RISK_ORDER: RiskLevel[] = ['LOW', 'MEDIUM', 'HIGH'];
 /** Skill.defaultAction 声明的兜底动作 → 实际要执行的动作集合 */
 const SKILL_DEFAULT_ACTIONS: Record<SkillDef['defaultAction'], AgentActionType[]> = {
   answer: ['answer'],
-  create_ticket: ['answer', 'create_ticket'],
-  human_review: ['answer', 'create_ticket', 'create_approval', 'handoff'],
-  handoff: ['answer', 'create_ticket', 'handoff'],
+  flow_entry: ['answer', 'flow_entry'],
+  human_review: ['answer', 'handoff'],
+  handoff: ['answer', 'handoff'],
 };
+
+const CORE_WRITE_TOOLS = new Set(['kb.record_gap', 'log.trace']);
+
+function flowEntryForIntent(intentId: string | null): string | undefined {
+  if (intentId === 'hr.leave_apply') return '去请假流程';
+  if (intentId === 'fin.reimburse_submit') return '去报销流程';
+  return undefined;
+}
 
 export interface RunAgentInput {
   message: string;
@@ -112,14 +119,18 @@ export async function runAgentTurn(input: RunAgentInput): Promise<AgentTurnResul
   // ── 0. 员工上下文 ──────────────────────────────────────────────────────
   const employee = await getEmployee(input.employeeId);
 
-  // ── 0.5 前置过滤：闲聊 + 域外请求（在主管线之前短路）────────────────────
-  // 不这么做的后果（三个都实测过）：
-  //   「你好」          → 识别不出意图 → 建工单 + 记知识缺口
+  // ── 0.5 规则兜底前置过滤：仅 mock 引擎使用 ───────────────────────────
+  // LLM 引擎下，员工输入后必须先进入大模型意图识别，由模型判断路由，
+  // 再按 Skill prompt 进入各自处理链路。这里的规则拦截只保留给 mock
+  // 或模型不可用时的兜底，避免 Demo 看起来像关键词机器人。
+  //
+  // mock 引擎不做这一层的后果（三个都实测过）：
+  //   「你好」          → 识别不出意图 → 记知识缺口
   //   「今天天气怎么样」→ 被当成「公司还没写天气制度」→ 沉淀知识缺口 + 转人工
-  //   「帮我写段排序」  → 硬套成薪酬咨询 → 判 HIGH → 建工单 + 建人工确认任务
+  //   「帮我写段排序」  → 硬套成薪酬咨询 → 误判成企业服务请求
   // 主管线假设「所有输入都是四个职能域内的服务请求」，所以总能找到最接近的意图。
   const t05 = Date.now();
-  const pre = classifyInput(question);
+  const pre = requestedEngine === 'llm' ? null : classifyInput(question);
   if (pre) {
     const isOutOfScope = pre.type === 'out_of_scope';
     pushTrace(
@@ -185,10 +196,9 @@ export async function runAgentTurn(input: RunAgentInput): Promise<AgentTurnResul
   let candidates: IntentCandidate[];
 
   if (requestedEngine === 'llm' && llmCfg) {
-    // 级联策略：先跑规则引擎（~1ms、0 成本），置信度够高就直接用，
-    // 不够才升级到大模型。省一次调用 = 省一半延迟和一半 token。
-    // 这不是偷懒：「OA 密码忘了」这种明确表述，正则的判断和大模型一样准，
-    // 花 20 秒等模型确认一遍没有收益。
+    // 默认策略是 llm-first：用户一句话进来，先让大模型做语义识别与路由，
+    // 再进入不同 Skill prompt。rules-first-escalate 仍保留为成本优化选项，
+    // 但当前 Demo 为了表达 AI Native 工作台，配置里默认不启用。
     let ruleCandidates: IntentCandidate[] | null = null;
     let skipLlmIntent = false;
 
@@ -218,22 +228,21 @@ export async function runAgentTurn(input: RunAgentInput): Promise<AgentTurnResul
         candidates = r.candidates;
         recordLlmUsage(r.usage, r.durationMs);
 
-        // 模型判定为域外：和前置规则拦截走同一条出口 —— 说明范围，不建单不沉淀。
-        // 这是第二层防御，兜住规则黑名单没覆盖到的域外问法。
+        // 模型判定为非服务类功能请求：说明当前暂不支持，不建单不沉淀。
+        // 轻量闲聊应该被模型归到 companion.work_chat；这里处理的是写代码、
+        // 查新闻、推荐餐厅这类明确功能性诉求。
         if (r.outOfScope) {
-          const oosCfg = cfg.intents.outOfScope;
           const reply = [
-            oosCfg?.replyPrefix ?? '这个不在企业服务台的范围内。',
-            oosCfg?.replySuffix ??
-              '我能帮你处理的是 IT、HR、财务、行政四类事情，比如查制度、申请权限、报修设备、提交报销、预定会议室。',
+            '这个我暂时处理不了。',
+            '我现在更适合帮你处理工作陪伴、公司制度问答、客户评审准备，以及 IT / 行政问题的人工接入；请假和报销会引导到公司已有流程入口。',
           ]
             .filter(Boolean)
             .join('\n\n');
 
           pushTrace(
             'prefilter',
-            '域外请求拦截 · 大模型判定',
-            '模型返回 scope=out_of_scope（规则黑名单未覆盖此问法）→ 说明服务范围，不建单、不沉淀知识缺口',
+            '非服务类功能请求 · 大模型判定',
+            '模型返回 scope=out_of_scope → 说明当前暂不支持，不建单、不沉淀知识缺口',
             'OK',
             r.durationMs,
           );
@@ -286,7 +295,7 @@ export async function runAgentTurn(input: RunAgentInput): Promise<AgentTurnResul
             prefilter: {
               type: 'out_of_scope',
               kind: 'scope.llm_judged',
-              label: '大模型判定域外',
+              label: '非服务类功能请求',
               matchedBy: '模型返回 scope=out_of_scope',
             },
           };
@@ -477,9 +486,33 @@ export async function runAgentTurn(input: RunAgentInput): Promise<AgentTurnResul
       cfg.app.agent.recordGapWhenNoHit &&
       risk.forcedAction !== 'clarify'
     ) {
-      actions = Array.from(new Set<AgentActionType>([...actions, 'record_gap', 'handoff']));
+      const noHitActions: AgentActionType[] =
+        skill.defaultAction === 'human_review' || skill.defaultAction === 'handoff'
+          ? ['record_gap', candidate.domain === 'IT' || candidate.domain === 'ADMIN' ? 'handoff' : 'answer']
+          : ['record_gap'];
+      actions = Array.from(new Set<AgentActionType>([...actions, ...noHitActions]));
     }
     actions = actions.sort((a, b) => ACTION_ORDER[a] - ACTION_ORDER[b]);
+
+    // ── 6. 工具调用 ─────────────────────────────────────────────────────
+    // 先执行 Skill 声明的业务工具：比如预定会议室、推送提醒、读取历史资料。
+    // 这些动作是个人工作助手的核心，不包装成一张“编排工单”。
+    for (const toolId of skill.tools) {
+      const def = getTool(toolId);
+      if (!def || def.sideEffect !== 'write' || CORE_WRITE_TOOLS.has(toolId)) continue;
+      if (def.requiresApproval) continue;
+      if (risk.forcedAction === 'clarify') continue;
+      if (ctx.toolCalls.length >= cfg.app.agent.maxToolCallsPerTurn) break;
+      const tWrite = Date.now();
+      const { record } = await executeTool(toolId, ctx);
+      pushTrace(
+        'tool',
+        `执行 ${record.toolName}`,
+        record.summary ?? record.error ?? '',
+        record.status === 'OK' ? 'OK' : 'WARN',
+        Date.now() - tWrite,
+      );
+    }
 
     const answer = buildAnswer({
       intentId: candidate.id,
@@ -490,6 +523,7 @@ export async function runAgentTurn(input: RunAgentInput): Promise<AgentTurnResul
       slots,
       missingSlots: missing,
       risk,
+      toolCalls: ctx.toolCalls,
     });
     ctx.intent.suggestedAction = buildSuggestedAction({
       intentId: candidate.id,
@@ -500,29 +534,19 @@ export async function runAgentTurn(input: RunAgentInput): Promise<AgentTurnResul
       slots,
       missingSlots: missing,
       risk,
+      toolCalls: ctx.toolCalls,
     });
 
-    // ── 6. 工具调用 ─────────────────────────────────────────────────────
     for (const action of actions) {
       if (ctx.toolCalls.length >= cfg.app.agent.maxToolCallsPerTurn) break;
       const t6 = Date.now();
       if (action === 'record_gap') {
         const { record } = await executeTool('kb.record_gap', ctx);
         pushTrace('tool', '沉淀知识缺口', record.summary ?? record.error ?? '', record.status === 'OK' ? 'OK' : 'ERROR', Date.now() - t6);
-      } else if (action === 'create_ticket') {
-        const { record } = await executeTool('ticket.create', ctx);
-        pushTrace('tool', '创建工单', record.summary ?? record.error ?? '', record.status === 'OK' ? 'OK' : 'ERROR', Date.now() - t6);
-      } else if (action === 'create_approval') {
-        const { record } = await executeTool('approval.create', ctx);
-        pushTrace('tool', '创建人工确认任务', record.summary ?? record.error ?? '', record.status === 'OK' ? 'OK' : 'ERROR', Date.now() - t6);
       } else if (action === 'handoff') {
-        pushTrace('tool', '转人工', `已交由 ${skill.handoffTeam} 跟进`, 'WARN', Date.now() - t6);
+        pushTrace('tool', '转人工', `已标记 ${skill.handoffTeam} 人工介入`, 'WARN', Date.now() - t6);
       }
     }
-
-    const approvalId = ctx.toolCalls
-      .find((t) => t.toolId === 'approval.create')
-      ?.summary?.match(/AP-\d{8}-\d{4}/)?.[0];
 
     // ── 7. 回复合成 ─────────────────────────────────────────────────────
     const t7 = Date.now();
@@ -537,7 +561,7 @@ export async function runAgentTurn(input: RunAgentInput): Promise<AgentTurnResul
             ticketId: ctx.intent.ticketId,
             ticketStatus: risk.level === 'HIGH' ? '待人工确认' : '待受理',
             sla: `${slaHours} 小时`,
-            approvalId,
+            flowEntry: flowEntryForIntent(candidate.id),
             gapId: ctx.intent.gapId,
             manager: employee?.managerName ?? '直属上级',
           });
@@ -559,7 +583,12 @@ export async function runAgentTurn(input: RunAgentInput): Promise<AgentTurnResul
             missingSlots: missing,
             risk,
             actions,
-            artifacts: { ticketId: ctx.intent.ticketId, approvalId, gapId: ctx.intent.gapId },
+            artifacts: {
+              ticketId: ctx.intent.ticketId,
+              flowEntry: flowEntryForIntent(candidate.id),
+              gapId: ctx.intent.gapId,
+            },
+            toolCalls: ctx.toolCalls,
           },
           llmCfg,
         );
@@ -609,7 +638,7 @@ export async function runAgentTurn(input: RunAgentInput): Promise<AgentTurnResul
       answer: replyBody,
       artifacts: {
         ticketId: ctx.intent.ticketId,
-        approvalId,
+        flowEntry: flowEntryForIntent(candidate.id),
         gapId: ctx.intent.gapId,
       },
     });
