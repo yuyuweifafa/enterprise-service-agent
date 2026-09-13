@@ -52,7 +52,7 @@ export default function DashboardPage() {
     <div>
       <PageHeader
         title="效果看板"
-        description="口径写在 config/app.config.json 里，可自行调整。历史聚合来自 mock 数据，实时部分来自你在对话页产生的真实处理日志 —— 去聊一句再回来刷新，数字会变。"
+        description="看小助首答解决、流程入口和人工接入情况。实时部分来自员工端产生的真实处理日志。"
         actions={
           <div className="flex items-center gap-2">
             <label htmlFor="range" className="text-xs text-ink-muted">
@@ -105,7 +105,7 @@ export default function DashboardPage() {
               label="转人工率"
               value={pct(metrics.rates.escalationRate)}
               tone={metrics.rates.escalationRate <= metrics.targets.escalationRate ? 'good' : 'bad'}
-              hint={`目标 ≤ ${pct(metrics.targets.escalationRate, 0)} · 含高风险强制转人工`}
+              hint={`目标 ≤ ${pct(metrics.targets.escalationRate, 0)} · 只统计 IT / 行政接入`}
             />
             <StatCard
               label="平均响应时间"
@@ -181,15 +181,15 @@ export default function DashboardPage() {
 
               <div className="mt-5 space-y-2 border-t border-line pt-4 text-xs">
                 <div className="flex justify-between">
-                  <span className="text-ink-muted">Agent 自动建单</span>
-                  <span className="tabular-nums text-ink-soft">{metrics.totals.ticketsCreated} 张</span>
+                  <span className="text-ink-muted">流程入口触发</span>
+                  <span className="tabular-nums text-ink-soft">{metrics.totals.flowEntries} 次</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-ink-muted">人工确认任务</span>
-                  <span className="tabular-nums text-ink-soft">{metrics.totals.approvalsCreated} 条</span>
+                  <span className="text-ink-muted">人工接入</span>
+                  <span className="tabular-nums text-ink-soft">{metrics.totals.humanHandoffs || metrics.totals.escalated} 条</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-ink-muted">当前待确认</span>
+                  <span className="text-ink-muted">当前待接入</span>
                   <span
                     className={cn(
                       'tabular-nums',
@@ -204,7 +204,7 @@ export default function DashboardPage() {
           </div>
 
           <div className="grid gap-4 lg:grid-cols-3">
-            <Panel title="风险分级分布" description="低风险自动答复 / 中风险自动建单 / 高风险人工确认">
+            <Panel title="风险分级分布" description="低风险自动答复 / 中风险提醒确认 / 高风险不自动执行">
               <Donut
                 ariaLabel="风险等级分布环形图"
                 centerLabel="高风险占比"
@@ -220,25 +220,25 @@ export default function DashboardPage() {
               />
             </Panel>
 
-            <Panel title="职能域分布" description="会话量与工单量">
+            <Panel title="职能域分布" description="不同部门的会话量与人工接入量">
               <BarList
                 ariaLabel="各职能域会话量"
                 items={metrics.byDomain.map((d) => ({
                   label: DOMAIN_LABEL[d.domain],
                   value: d.conversations,
                   share: d.share,
-                  hint: `${d.tickets} 张工单`,
+                  hint: `${d.tickets} 次需跟进`,
                   color: DOMAIN_HEX[d.domain],
                 }))}
               />
             </Panel>
 
-            <Panel title="工单状态分布" description="全量工单，非仅统计区间">
+            <Panel title="跟进状态分布" description="需要人工或流程承接的事项状态">
               <BarList
-                ariaLabel="工单状态分布"
+                ariaLabel="跟进状态分布"
                 items={(() => {
-                  const total = metrics.ticketStatus.reduce((s, x) => s + x.count, 0) || 1;
-                  return metrics.ticketStatus
+                  const total = metrics.handoffStatus.reduce((s, x) => s + x.count, 0) || 1;
+                  return metrics.handoffStatus
                     .filter((s) => s.count > 0)
                     .map((s) => ({
                       label: TICKET_STATUS_LABEL[s.status],
@@ -314,22 +314,22 @@ export default function DashboardPage() {
             </Panel>
           </div>
 
-          <Panel title="口径说明" description="面试时被问「这些数字怎么算的」可以直接翻这里">
+          <Panel title="口径说明" description="这些指标用来说明小助上线后如何被持续运营。">
             <ul className="grid gap-2 text-xs leading-relaxed text-ink-soft md:grid-cols-2">
               <li>
-                <strong className="text-ink-soft">自助解决率</strong> = 未转人工的会话 / 总会话。高风险强制转人工会拉低这个值，这是有意为之的取舍。
+                <strong className="text-ink-soft">自助解决率</strong> = 未转 IT / 行政人工的会话 / 总会话。HR / 财务办理只算流程入口。
               </li>
               <li>
                 <strong className="text-ink-soft">知识命中率</strong> = 至少检索到 1 条超过相似度阈值片段的会话 / 总会话。阈值配置在 retrieval.scoreThreshold。
               </li>
               <li>
-                <strong className="text-ink-soft">转人工率</strong> = 触发 handoff 或判定 HIGH 的会话 / 总会话。
+                <strong className="text-ink-soft">转人工率</strong> = 进入 IT / 行政人工接入的会话 / 总会话。
               </li>
               <li>
                 <strong className="text-ink-soft">平均响应时间</strong> = 从收到问题到产出回复的服务端耗时，按会话量加权。
               </li>
               <li>
-                <strong className="text-ink-soft">节省工时</strong> = Σ(各职能域自动解决量 × 该域人工单次处理分钟数) / 60，分钟数配置在 metrics.manualHandlingMinutes。
+                <strong className="text-ink-soft">节省工时</strong> = 各职能域自动解决量 × 原本人工平均处理时长，再折算成小时。
               </li>
               <li>
                 <strong className="text-ink-soft">节省成本</strong> = 节省工时 × metrics.hourlyCostCNY（默认 85 元/小时）。

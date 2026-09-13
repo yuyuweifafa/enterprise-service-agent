@@ -1,8 +1,6 @@
 import type { Citation, Domain, Employee, RiskLevel, ToolCallRecord } from '@/lib/types';
 import { getTool, type ToolDef } from '@/server/config';
-import { getEmployee, listPermissions } from '@/server/repositories/employees';
-import { createTicket, updateTicket } from '@/server/repositories/tickets';
-import { createApproval } from '@/server/repositories/approvals';
+import { getEmployee } from '@/server/repositories/employees';
 import { recordGap } from '@/server/repositories/gaps';
 import { searchKnowledge } from '@/server/knowledge';
 
@@ -73,16 +71,63 @@ const handlers: Record<string, (args: Record<string, unknown>, ctx: ToolContext)
     };
   },
 
-  'it.get_permissions': async (args) => {
-    const rows = await listPermissions(
-      String(args.employeeId ?? ''),
-      args.system ? String(args.system) : undefined,
-    );
+  'calendar.find_slots': async (args, ctx) => {
+    const date = String(args.date ?? '明天');
+    const location = ctx.employee?.location ?? '当前办公地';
     return {
-      data: rows,
-      summary: rows.length
-        ? rows.map((r) => `${r.system}: ${r.status}`).join('；')
-        : '无匹配的权限记录',
+      data: [
+        { date, start: '10:00', end: '11:00', status: 'FREE' },
+        { date, start: '15:00', end: '16:00', status: 'FREE' },
+      ],
+      summary: `${date} ${location} 可用空闲时间：10:00-11:00、15:00-16:00`,
+    };
+  },
+
+  'meeting.find_rooms': async (args, ctx) => {
+    const location = String(args.location ?? ctx.employee?.location ?? '上海');
+    const date = String(args.date ?? '明天');
+    const headcount = Number(args.headcount ?? 6);
+    return {
+      data: [
+        { room: `${location} · 湖畔会议室`, capacity: 6, slot: '15:00-16:00', equipment: ['投屏', '视频会议'] },
+        { room: `${location} · 星云会议室`, capacity: 8, slot: '10:00-11:00', equipment: ['投影', '白板'] },
+      ],
+      summary: `${date} 已找到适合 ${headcount} 人的会议室：${location} · 湖畔会议室 15:00-16:00，可投屏和视频会议；备选 ${location} · 星云会议室 10:00-11:00`,
+    };
+  },
+
+  'docs.search_customer_history': async () => {
+    return {
+      data: {
+        customer: '示例客户',
+        lastMeetingConcerns: ['排课成功率', '教师资源利用率', '上线风险', '数据看板口径'],
+        materialChecklist: [
+          { name: '评审方案文档', status: 'READY' },
+          { name: '排课成功率数据看板', status: 'NEEDS_UPDATE' },
+          { name: '上线风险与兜底预案', status: 'READY' },
+        ],
+      },
+      summary: '已阅读历史会议纪要和项目文档：客户上次重点关注排课成功率、教师资源利用率、上线风险；本次材料中评审方案和风险预案已准备，数据看板需补最新截图',
+    };
+  },
+
+  'weather.get_forecast': async (args) => {
+    const location = String(args.location ?? '当前城市');
+    const date = String(args.date ?? '明天');
+    return {
+      data: { location, date, condition: '多云', low: 24, high: 29, commute: '通勤舒适' },
+      summary: `${date} ${location} 多云，24-29°C，通勤舒适；建议商务休闲、浅色上装，提前 10 分钟到会议室调整状态`,
+    };
+  },
+
+  'leave.get_balance': async (_args, ctx) => {
+    const annualRemaining = ctx.employee
+      ? Number((ctx.employee.annualLeaveTotal - ctx.employee.annualLeaveUsed).toFixed(1))
+      : 0;
+    const compTimeDays = ctx.employee?.compTimeDays ?? 0;
+    return {
+      data: { annualRemaining, compTimeDays },
+      summary: `年假剩余 ${annualRemaining} 天，可用调休 ${compTimeDays} 天`,
     };
   },
 
@@ -107,73 +152,28 @@ const handlers: Record<string, (args: Record<string, unknown>, ctx: ToolContext)
     };
   },
 
-  'ticket.create': async (args, ctx) => {
-    const ticket = await createTicket({
-      employeeId: String(args.employeeId ?? 'UNKNOWN'),
-      employeeName: ctx.employee?.name ?? '未知员工',
-      domain: (args.domain as Domain) ?? 'UNKNOWN',
-      intentId: (args.intentId as string) ?? null,
-      title: String(args.title ?? ctx.intent.label),
-      description: String(args.description ?? ctx.intent.query),
-      riskLevel: (args.riskLevel as RiskLevel) ?? 'MEDIUM',
-      assigneeTeam: ctx.handoffTeam,
-      source: 'AGENT',
-      slots: (args.slots as Record<string, unknown>) ?? {},
-      citations: ctx.citations.map((c) => ({ docId: c.docId, title: c.title, section: c.section })),
-      linkedGapId: ctx.intent.gapId ?? null,
-    });
-    ctx.intent.ticketId = ticket.id;
-    return { data: ticket, summary: `已创建工单 ${ticket.id}（${ticket.assigneeTeam} / ${ticket.priority}）` };
-  },
-
-  'ticket.update_status': async (args) => {
-    const ticket = await updateTicket(String(args.ticketId ?? ''), {
-      status: args.status as never,
-      note: args.note ? String(args.note) : undefined,
-      actor: 'AGENT',
-    });
+  'meeting.book_room': async (args, ctx) => {
+    const date = String(args.date ?? '明天');
+    const employeeName = ctx.employee?.name ?? '员工';
     return {
-      data: ticket,
-      summary: ticket ? `工单 ${ticket.id} → ${ticket.status}` : '未找到工单',
+      data: {
+        bookingId: 'MR-20260904-001',
+        room: `${ctx.employee?.location ?? '上海'} · 湖畔会议室`,
+        date,
+        slot: '15:00-16:00',
+        status: 'HELD',
+      },
+      summary: `已为 ${employeeName} 锁定 ${date} 15:00-16:00 的${ctx.employee?.location ?? '上海'} · 湖畔会议室，客户时间确认后可自动调整或释放`,
     };
   },
 
-  'approval.create': async (args, ctx) => {
-    const approval = await createApproval({
-      ticketId: (args.ticketId as string) ?? ctx.intent.ticketId ?? null,
-      employeeId: String(args.employeeId ?? 'UNKNOWN'),
-      employeeName: ctx.employee?.name ?? '未知员工',
-      domain: (args.domain as Domain) ?? 'UNKNOWN',
-      intentId: (args.intentId as string) ?? null,
-      title: String(args.title ?? ctx.intent.label),
-      riskLevel: (args.riskLevel as RiskLevel) ?? 'HIGH',
-      riskReasons: (args.riskReasons as string[]) ?? ctx.risk.reasons,
-      suggestedAction: String(args.suggestedAction ?? ctx.intent.suggestedAction),
-      reviewerTeam: ctx.handoffTeam,
-      agentEvidence: {
-        employeeSnapshot: ctx.employee
-          ? {
-              status: ctx.employee.status,
-              hireDate: ctx.employee.hireDate,
-              department: ctx.employee.department,
-              level: ctx.employee.level,
-            }
-          : {},
-        citations: ctx.citations.map((c) => ({
-          docId: c.docId,
-          title: c.title,
-          section: c.section,
-          score: c.score,
-        })),
-        toolCalls: ctx.toolCalls.map((t) => ({
-          toolId: t.toolId,
-          status: t.status,
-          durationMs: t.durationMs,
-          summary: t.summary,
-        })),
-      },
-    });
-    return { data: approval, summary: `已创建人工确认任务 ${approval.id}（${approval.reviewerTeam}）` };
+  'reminder.create': async (args) => {
+    const title = String(args.title ?? '工作提醒');
+    const date = String(args.date ?? '明天');
+    return {
+      data: { reminderId: 'REM-20260904-001', title, date, due: '18:00' },
+      summary: `已推送日程提醒：今天 18:00 前联系客户确认 ${date} 评审时间，并在会前检查资料`,
+    };
   },
 
   'kb.record_gap': async (args, ctx) => {

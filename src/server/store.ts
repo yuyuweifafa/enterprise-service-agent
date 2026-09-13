@@ -19,9 +19,9 @@ export type CollectionName =
   | 'employees'
   | 'permissions'
   | 'tickets'
-  | 'approvals'
   | 'knowledge-gaps'
   | 'agent-logs'
+  | 'conversation-messages'
   | 'metrics-history';
 
 /** 只读集合直接从 seed 读，不落 runtime，避免无意义的文件拷贝 */

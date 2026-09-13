@@ -126,7 +126,7 @@ function IntentCard({
         <h4 className="label mb-2">知识库引用来源</h4>
         {intent.citations.length === 0 ? (
           <p className="rounded-md border border-amber-500/30 bg-amber-500/5 px-2.5 py-2 text-xs text-amber-600">
-            未命中（最高分 {intent.topScore}）→ 已按规则沉淀知识缺口并转人工
+            未命中（最高分 {intent.topScore}）→ 已按规则沉淀知识缺口；IT / 行政问题可由人工接入
           </p>
         ) : (
           <ol className="space-y-2">
@@ -198,29 +198,29 @@ function IntentCard({
         </div>
         {/*
           产物在两种模式下都要展示，但落点不同：
-          完整模式给运营跳后台处理；精简模式只给员工看单号 ——
+          完整模式给运营跳后台处理；精简模式只给员工看记录 ——
           员工没有后台权限，给他一个跳 /console 的链接是把他推到 403。
         */}
         <div className="flex flex-wrap gap-2 text-xs">
           {intent.artifacts.ticketId ? (
             compact ? (
               <span className="rounded-md border border-line bg-surface-2 px-2 py-1 font-mono text-[11px] text-ink-soft">
-                工单 {intent.artifacts.ticketId}
+                接入记录 {intent.artifacts.ticketId}
               </span>
             ) : (
               <Link href={`/console/tickets?q=${intent.artifacts.ticketId}`} className="btn px-2 py-1 text-xs">
-                工单 {intent.artifacts.ticketId} →
+                接入记录 {intent.artifacts.ticketId} →
               </Link>
             )
           ) : null}
-          {intent.artifacts.approvalId ? (
+          {intent.artifacts.flowEntry ? (
             compact ? (
               <span className="rounded-md border border-line bg-surface-2 px-2 py-1 font-mono text-[11px] text-ink-soft">
-                审批 {intent.artifacts.approvalId}
+                流程入口 {intent.artifacts.flowEntry}
               </span>
             ) : (
-              <Link href={`/console/review?q=${intent.artifacts.approvalId}`} className="btn px-2 py-1 text-xs">
-                审核任务 {intent.artifacts.approvalId} →
+              <Link href="/console/tickets" className="btn px-2 py-1 text-xs">
+                流程入口 {intent.artifacts.flowEntry} →
               </Link>
             )
           ) : null}
@@ -316,7 +316,7 @@ export function AgentInspector({
             {result.prefilter.matchedBy}），直接返回回复。
           </p>
           <ul className="mt-2 space-y-1 text-[11px] text-ink-faint">
-            <li>· 未检索知识库，未建工单，未沉淀知识缺口</li>
+            <li>· 未检索知识库，未进入流程，未沉淀知识缺口</li>
             <li>· 未调用大模型（省一轮 token）</li>
             <li>· 已记日志但标记为 {result.prefilter.type}，不计入看板的服务请求口径</li>
             {isOutOfScope ? (
@@ -441,7 +441,7 @@ export function AgentInspector({
 
       {compact ? (
         <p className="text-[11px] leading-relaxed text-ink-faint">
-          以上依据来自公司制度库。如果和你了解的情况不一致，点回复下方的「没用」告诉我，会转人工核实。
+          以上依据来自公司制度库。如果和你了解的情况不一致，点回复下方的「没用，转人工」，对应部门会带着这段对话和 Agent 判断记录介入。
         </p>
       ) : (
         <p className="text-[11px] leading-relaxed text-ink-faint">

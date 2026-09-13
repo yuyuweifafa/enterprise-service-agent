@@ -6,14 +6,14 @@ import { listTickets } from '@/server/repositories/tickets';
 /**
  * GET /api/portal?employeeId=E1001
  *
- * 员工端门户的概览数据。**只返回该员工自己的数据**，这是员工端与后台的权限边界：
- * 后台的 /api/tickets 可以查全量队列，这个接口按 employeeId 收敛。
+ * 员工端概览数据。**只返回该员工自己的数据**，这是员工端与后台的权限边界：
+ * 后台接口可以查人工接入队列，这个接口按 employeeId 收敛。
  *
  * 真实环境里 employeeId 不该由前端传，而是从会话（SSO）里取，
- * 否则改一下 query 就能看别人的工单。当前 Demo 未接鉴权，这里显式留个记号。
+ * 否则改一下 query 就能看别人的记录。当前 Demo 未接鉴权，这里显式留个记号。
  */
 
-/** 员工视角下「还没完结」的工单状态 */
+/** 员工视角下「还没完结」的事项状态 */
 const ACTIVE_STATUSES: Ticket['status'][] = ['OPEN', 'IN_PROGRESS', 'PENDING_REVIEW'];
 
 export const GET = withErrorHandling(async (req: Request) => {
@@ -44,16 +44,16 @@ export const GET = withErrorHandling(async (req: Request) => {
     cards: [
       {
         key: 'tickets',
-        title: '进行中的工单',
+        title: '处理中事项',
         value: active.length,
         hint:
           active.length > 0
             ? active.slice(0, 3).map((t) => t.title).join('、')
-            : '当前没有在处理的工单',
+            : '当前没有在处理的事项',
       },
       {
         key: 'pending',
-        title: '等待人工确认',
+        title: '等待人工接入',
         value: awaitingReview.length,
         hint:
           awaitingReview.length > 0
@@ -76,7 +76,7 @@ export const GET = withErrorHandling(async (req: Request) => {
       compTimeDays: employee.compTimeDays,
       expiringPermissions: expiring.map((p) => ({ system: p.system, expiresAt: p.expiresAt })),
     },
-    /** 最近动态：该员工的工单时间线，倒序 */
+    /** 最近动态：该员工的人工接入记录，倒序 */
     recent: tickets.slice(0, 5).map((t) => ({
       id: t.id,
       title: t.title,

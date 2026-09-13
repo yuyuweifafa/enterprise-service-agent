@@ -10,8 +10,7 @@ export type RiskLevel = 'LOW' | 'MEDIUM' | 'HIGH';
 export type AgentActionType =
   | 'answer'
   | 'clarify'
-  | 'create_ticket'
-  | 'create_approval'
+  | 'flow_entry'
   | 'record_gap'
   | 'handoff';
 
@@ -22,8 +21,6 @@ export type TicketStatus =
   | 'RESOLVED'
   | 'CLOSED'
   | 'REJECTED';
-
-export type ApprovalStatus = 'PENDING' | 'APPROVED' | 'REJECTED' | 'TAKEN_OVER';
 
 export type GapStatus = 'OPEN' | 'DRAFTING' | 'PUBLISHED' | 'IGNORED';
 
@@ -99,7 +96,7 @@ export interface Citation {
   updatedAt: string;
 }
 
-// ── 工单 / 审批 / 知识缺口 / 日志 ─────────────────────────────────────────
+// ── 人工接入 / 知识缺口 / 日志 ───────────────────────────────────────────
 
 export interface TicketTimelineEntry {
   at: string;
@@ -128,35 +125,8 @@ export interface Ticket {
   updatedAt: string;
   slaDueAt: string;
   resolvedAt: string | null;
-  linkedApprovalId?: string | null;
   linkedGapId?: string | null;
   timeline: TicketTimelineEntry[];
-}
-
-export interface ApprovalEvidence {
-  employeeSnapshot: Record<string, unknown>;
-  citations: Array<{ docId: string; title: string; section: string; score: number }>;
-  toolCalls: Array<{ toolId: string; status: string; durationMs: number; summary?: string }>;
-}
-
-export interface Approval {
-  id: string;
-  ticketId: string | null;
-  employeeId: string;
-  employeeName: string;
-  domain: Domain;
-  intentId: string | null;
-  title: string;
-  riskLevel: RiskLevel;
-  riskReasons: string[];
-  suggestedAction: string;
-  reviewerTeam: string;
-  reviewer: string | null;
-  status: ApprovalStatus;
-  createdAt: string;
-  decidedAt: string | null;
-  decisionNote: string | null;
-  agentEvidence: ApprovalEvidence;
 }
 
 export interface KnowledgeGap {
@@ -236,6 +206,17 @@ export type EscalationReason =
   /** 自动解决动作执行失败 */
   | 'resolution_failed';
 
+export interface ConversationMessage {
+  id: string;
+  sessionId: string;
+  traceId?: string | null;
+  employeeId: string;
+  role: 'employee' | 'agent' | 'human';
+  authorName: string;
+  text: string;
+  createdAt: string;
+}
+
 // ── Agent 运行结果（对话侧栏的数据契约）───────────────────────────────────
 
 export interface ResolvedIntent {
@@ -257,7 +238,7 @@ export interface ResolvedIntent {
   answer: string;
   artifacts: {
     ticketId?: string;
-    approvalId?: string;
+    flowEntry?: string;
     gapId?: string;
   };
 }
@@ -338,8 +319,8 @@ export interface MetricsSummary {
     autoResolved: number;
     escalated: number;
     knowledgeHit: number;
-    ticketsCreated: number;
-    approvalsCreated: number;
+    flowEntries: number;
+    humanHandoffs: number;
   };
   rates: {
     resolutionRate: number;
@@ -379,7 +360,7 @@ export interface MetricsSummary {
     tickets: number;
   }>;
   riskDistribution: Array<{ level: RiskLevel; count: number; share: number }>;
-  ticketStatus: Array<{ status: TicketStatus; count: number }>;
+  handoffStatus: Array<{ status: TicketStatus; count: number }>;
   topGaps: Array<{ id: string; question: string; domain: Domain; occurrences: number; status: GapStatus }>;
   pendingReview: number;
   /** 被剔除在服务请求口径之外的闲聊会话数 */

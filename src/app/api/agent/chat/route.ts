@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { runAgentTurn } from '@/agent/pipeline';
 import { getConfig } from '@/server/config';
 import { fail, ok, parseBody, withErrorHandling } from '@/server/http';
+import { appendConversationMessage } from '@/server/repositories/conversation-messages';
 import { getEmployee } from '@/server/repositories/employees';
 
 const schema = z.object({
@@ -28,6 +29,23 @@ export const POST = withErrorHandling(async (req: Request) => {
     message: parsed.data.message,
     employeeId,
     sessionId: parsed.data.sessionId,
+  });
+
+  await appendConversationMessage({
+    sessionId: result.sessionId,
+    traceId: result.traceId,
+    employeeId,
+    role: 'employee',
+    authorName: employee.name,
+    text: parsed.data.message,
+  });
+  await appendConversationMessage({
+    sessionId: result.sessionId,
+    traceId: result.traceId,
+    employeeId,
+    role: 'agent',
+    authorName: '小助',
+    text: result.reply,
   });
 
   return ok(result, { engine: result.engine, latencyMs: result.latencyMs });

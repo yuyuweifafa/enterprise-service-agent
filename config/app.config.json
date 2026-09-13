@@ -1,16 +1,16 @@
 {
   "$comment": "全局运行参数。改这里不需要动代码。",
   "app": {
-    "name": "企业内部服务智能体",
-    "shortName": "ESA",
-    "tagline": "IT / HR / 财务 / 行政 一站式智能服务台",
+    "name": "小助个人工作助手",
+    "shortName": "小助",
+    "tagline": "陪你理事、查制度、准备客户评审，必要时转 IT / 行政人工",
     "defaultEmployeeId": "E1001"
   },
   "agent": {
-    "$engineComment": "mock = 规则引擎（默认，零成本零依赖）；llm = 大模型驱动意图识别与回复生成。可用环境变量 AGENT_ENGINE 覆盖。engine=llm 但缺 API Key 会直接启动失败，不会静默退回规则。",
-    "engine": "mock",
+    "$engineComment": "mock = 规则引擎；llm = 大模型驱动意图识别与回复生成。当前 Demo 用固定意图白名单约束模型，避免自由编能力。",
+    "engine": "llm",
     "maxIntentsPerTurn": 3,
-    "maxToolCallsPerTurn": 6,
+    "maxToolCallsPerTurn": 8,
     "clarifyWhenSlotMissing": true,
     "recordGapWhenNoHit": true
   },
@@ -26,15 +26,15 @@
     "maxRetries": 2,
     "$fallbackComment": "true = 单次调用失败时降级到规则引擎保证可用性，但结果里会标 degraded=true 并在链路里写明原因，绝不伪装成大模型输出。false = 直接报错。",
     "fallbackToRules": true,
-    "$intentStrategyComment": "llm-first = 总是让大模型识别意图（最准）；rules-first-escalate = 先跑规则引擎（0 成本 ~1ms），置信度 ≥ 阈值就直接用，不够才升级到大模型。后者能省掉一次调用，延迟和 token 成本都减半。",
-    "intentStrategy": "rules-first-escalate",
+    "$intentStrategyComment": "llm-first = 员工输入后立刻调用大模型识别意图与路由；rules-first-escalate = 先跑规则引擎，置信度不够才升级到大模型。当前 Demo 为了体现 AI Native 工作台，默认使用 llm-first。",
+    "intentStrategy": "llm-first",
     "intentEscalationThreshold": 0.7,
     "$extraBodyComment": "原样合并进请求体的供应商私有参数。thinking.disabled 是智谱关闭思考模式的开关，实测能把延迟降好几倍（服务台场景不需要模型长篇推理）。换成 DeepSeek / 通义 / OpenAI 时把这里改成 {} ，否则可能因为未知参数被拒。",
     "extraBody": { "thinking": { "type": "disabled" } }
   },
   "retrieval": {
     "topK": 4,
-    "$scoreThresholdComment": "低于该相似度视为未命中 → 触发知识缺口沉淀 + 转人工。用 scripts/tune-threshold.mjs 扫描正负样例后再调，当前值下正样例最低 0.24、负样例最高 0.17。",
+    "$scoreThresholdComment": "低于该相似度视为未命中 → 触发知识缺口沉淀；只有 IT / 行政类问题可继续转人工。用 scripts/tune-threshold.mjs 扫描正负样例后再调，当前值下正样例最低 0.24、负样例最高 0.17。",
     "scoreThreshold": 0.2,
     "snippetMaxChars": 320,
     "$retrievalComment": "打分 = 章节级信号（二级标题 titleWeight + 正文 bodyWeight）+ docBonusRatio × 文档级信号（文档标题 / keywords / tags）。每个字段取最高权重而非求和，避免同一个词重复计分、以及一篇文档所有章节同分。",
@@ -74,7 +74,7 @@
     "excludeSmallTalkFromMetrics": true
   },
   "sla": {
-    "$comment": "工单按风险等级的响应/解决时限（小时）",
+    "$comment": "IT / 行政人工接入按风险等级的响应/解决时限（小时）",
     "LOW": { "responseHours": 8, "resolveHours": 24 },
     "MEDIUM": { "responseHours": 4, "resolveHours": 16 },
     "HIGH": { "responseHours": 1, "resolveHours": 8 }

@@ -2,7 +2,7 @@
   "name": "enterprise-service-agent",
   "version": "0.1.0",
   "private": true,
-  "description": "企业内部服务智能体 Demo：面向员工的 IT / HR / 财务 / 行政一站式智能服务台",
+  "description": "小助个人工作助手 Demo：工作陪伴、知识库问答、客户评审准备与 IT / 行政人工接入",
   "engines": {
     "node": ">=18.18.0"
   },

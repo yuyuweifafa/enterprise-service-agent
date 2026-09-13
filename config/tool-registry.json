@@ -1,292 +1,141 @@
 {
-  "$comment": "工具注册表。每个工具描述 = 大模型看到的 function schema；endpoint 指向本项目的 mock API，后续替换为真实企业系统接口即可，Agent 侧无需改动。args[].from 支持 slot（意图槽位）/ context（上下文取值路径）/ const（固定值）。",
-  "version": "0.1.0",
+  "$comment": "当前 Demo 只保留 5 个模拟能力：知识库检索、员工档案、日程空闲、会议室查询/预定、消息/日程提醒；另保留请假余额和知识缺口沉淀用于演示。",
+  "version": "0.2.0",
   "tools": [
     {
       "id": "hr.get_employee",
-      "name": "查询员工信息",
-      "description": "根据工号查询员工姓名、部门、职级、入职日期、直属上级、办公地。",
+      "name": "查询员工档案",
+      "description": "根据工号查询员工姓名、部门、职级、办公地、直属上级、年假和调休信息。",
       "endpoint": "/api/employees/:employeeId",
       "method": "GET",
       "sideEffect": "read",
       "requiresApproval": false,
-      "args": [
-        {
-          "name": "employeeId",
-          "type": "string",
-          "required": true,
-          "from": "context",
-          "path": "employee.id"
-        }
-      ]
+      "args": [{ "name": "employeeId", "type": "string", "required": true, "from": "context", "path": "employee.id" }]
     },
     {
-      "id": "it.get_permissions",
-      "name": "查询权限状态",
-      "description": "查询员工在各业务系统中的权限授予状态、有效期与授权级别。",
-      "endpoint": "/api/permissions",
+      "id": "leave.get_balance",
+      "name": "查询假期余额",
+      "description": "读取员工年假、调休等可用假期余额，用于请假流程入口前的信息整理。",
+      "endpoint": "/api/mock/hr/leave-balance",
       "method": "GET",
       "sideEffect": "read",
       "requiresApproval": false,
-      "args": [
-        {
-          "name": "employeeId",
-          "type": "string",
-          "required": true,
-          "from": "context",
-          "path": "employee.id"
-        },
-        {
-          "name": "system",
-          "type": "string",
-          "required": false,
-          "from": "slot",
-          "slot": "system"
-        }
-      ]
+      "args": [{ "name": "employeeId", "type": "string", "required": true, "from": "context", "path": "employee.id" }]
     },
     {
       "id": "kb.search",
-      "name": "检索企业知识库",
-      "description": "在 IT / HR / 财务 / 行政知识库中检索制度条款，返回带来源标识与相似度的片段。",
+      "name": "检索知识库",
+      "description": "在 IT / HR / 财务 / 行政知识库中检索制度、流程和操作说明，返回带来源和相似度的片段。",
       "endpoint": "/api/knowledge/search",
       "method": "GET",
       "sideEffect": "read",
       "requiresApproval": false,
       "args": [
-        {
-          "name": "q",
-          "type": "string",
-          "required": true,
-          "from": "context",
-          "path": "intent.query"
-        },
-        {
-          "name": "domain",
-          "type": "string",
-          "required": false,
-          "from": "context",
-          "path": "intent.domain"
-        }
+        { "name": "q", "type": "string", "required": true, "from": "context", "path": "intent.query" },
+        { "name": "domain", "type": "string", "required": false, "from": "context", "path": "intent.domain" }
       ]
     },
     {
-      "id": "ticket.create",
-      "name": "创建工单",
-      "description": "为需要人工/系统落地的诉求创建工单，自动路由到对应职能团队并按风险等级设置 SLA。",
-      "endpoint": "/api/tickets",
+      "id": "calendar.find_slots",
+      "name": "识别空闲时间",
+      "description": "读取员工日程，找出目标日期可用于客户评审的空闲时间。",
+      "endpoint": "/api/mock/calendar/slots",
+      "method": "GET",
+      "sideEffect": "read",
+      "requiresApproval": false,
+      "args": [
+        { "name": "employeeId", "type": "string", "required": true, "from": "context", "path": "employee.id" },
+        { "name": "date", "type": "string", "required": false, "from": "slot", "slot": "startDate" }
+      ]
+    },
+    {
+      "id": "meeting.find_rooms",
+      "name": "查询会议室",
+      "description": "根据员工所在地、日期、人数和空闲时间查询可用会议室。",
+      "endpoint": "/api/mock/meeting/rooms",
+      "method": "GET",
+      "sideEffect": "read",
+      "requiresApproval": false,
+      "args": [
+        { "name": "location", "type": "string", "required": false, "from": "context", "path": "employee.location" },
+        { "name": "date", "type": "string", "required": false, "from": "slot", "slot": "startDate" },
+        { "name": "headcount", "type": "number", "required": false, "from": "slot", "slot": "headcount" }
+      ]
+    },
+    {
+      "id": "docs.search_customer_history",
+      "name": "搜索客户历史资料",
+      "description": "检索客户历史会议纪要、聊天记录和方案文档，提取本次评审需要准备的资料清单。",
+      "endpoint": "/api/mock/docs/customer-history",
+      "method": "GET",
+      "sideEffect": "read",
+      "requiresApproval": false,
+      "args": [{ "name": "query", "type": "string", "required": true, "from": "context", "path": "intent.query" }]
+    },
+    {
+      "id": "weather.get_forecast",
+      "name": "查询天气与通勤提醒",
+      "description": "查询目标日期的天气、通勤和着装建议，用于客户评审前提醒。",
+      "endpoint": "/api/mock/weather",
+      "method": "GET",
+      "sideEffect": "read",
+      "requiresApproval": false,
+      "args": [
+        { "name": "location", "type": "string", "required": false, "from": "context", "path": "employee.location" },
+        { "name": "date", "type": "string", "required": false, "from": "slot", "slot": "startDate" }
+      ]
+    },
+    {
+      "id": "meeting.book_room",
+      "name": "锁定会议室",
+      "description": "根据推荐空闲时间锁定候选会议室；客户时间最终确认前可调整。",
+      "endpoint": "/api/mock/meeting/book",
       "method": "POST",
       "sideEffect": "write",
       "requiresApproval": false,
       "args": [
-        {
-          "name": "employeeId",
-          "type": "string",
-          "required": true,
-          "from": "context",
-          "path": "employee.id"
-        },
-        {
-          "name": "domain",
-          "type": "string",
-          "required": true,
-          "from": "context",
-          "path": "intent.domain"
-        },
-        {
-          "name": "intentId",
-          "type": "string",
-          "required": false,
-          "from": "context",
-          "path": "intent.id",
-          "$comment": "不能设为必填：意图未识别时（兜底 Skill）intentId 就是 null，设成必填会让整个工具调用被跳过 —— 后果是知识缺口记下了但没人跟进，而回复却告诉员工已转人工。Ticket/Approval 的类型定义里 intentId 本来就允许 null。"
-        },
-        {
-          "name": "title",
-          "type": "string",
-          "required": true,
-          "from": "context",
-          "path": "intent.title"
-        },
-        {
-          "name": "description",
-          "type": "string",
-          "required": true,
-          "from": "context",
-          "path": "intent.query"
-        },
-        {
-          "name": "riskLevel",
-          "type": "string",
-          "required": true,
-          "from": "context",
-          "path": "risk.level"
-        },
-        {
-          "name": "slots",
-          "type": "object",
-          "required": false,
-          "from": "context",
-          "path": "intent.slots"
-        }
+        { "name": "employeeId", "type": "string", "required": true, "from": "context", "path": "employee.id" },
+        { "name": "date", "type": "string", "required": false, "from": "slot", "slot": "startDate" }
       ]
     },
     {
-      "id": "ticket.update_status",
-      "name": "更新工单状态",
-      "description": "推进工单状态：OPEN → IN_PROGRESS → RESOLVED / CLOSED / REJECTED，并写入处理备注。",
-      "endpoint": "/api/tickets/:ticketId",
-      "method": "PATCH",
+      "id": "reminder.create",
+      "name": "推送日程提醒",
+      "description": "把需要员工主动完成的动作写入个人日程，例如联系客户确认时间、会前检查材料。",
+      "endpoint": "/api/mock/reminders",
+      "method": "POST",
       "sideEffect": "write",
       "requiresApproval": false,
       "args": [
-        {
-          "name": "ticketId",
-          "type": "string",
-          "required": true,
-          "from": "slot",
-          "slot": "ticketId"
-        },
-        {
-          "name": "status",
-          "type": "string",
-          "required": true,
-          "from": "slot",
-          "slot": "status"
-        },
-        {
-          "name": "note",
-          "type": "string",
-          "required": false,
-          "from": "slot",
-          "slot": "note"
-        }
-      ]
-    },
-    {
-      "id": "approval.create",
-      "name": "创建审批 / 人工确认任务",
-      "description": "高风险事项创建人工确认任务，附带 Agent 建议动作与判定依据，等待人工确认、驳回或接管。",
-      "endpoint": "/api/approvals",
-      "method": "POST",
-      "sideEffect": "write",
-      "requiresApproval": true,
-      "args": [
-        {
-          "name": "employeeId",
-          "type": "string",
-          "required": true,
-          "from": "context",
-          "path": "employee.id"
-        },
-        {
-          "name": "domain",
-          "type": "string",
-          "required": true,
-          "from": "context",
-          "path": "intent.domain"
-        },
-        {
-          "name": "intentId",
-          "type": "string",
-          "required": false,
-          "from": "context",
-          "path": "intent.id",
-          "$comment": "不能设为必填：意图未识别时（兜底 Skill）intentId 就是 null，设成必填会让整个工具调用被跳过 —— 后果是知识缺口记下了但没人跟进，而回复却告诉员工已转人工。Ticket/Approval 的类型定义里 intentId 本来就允许 null。"
-        },
-        {
-          "name": "title",
-          "type": "string",
-          "required": true,
-          "from": "context",
-          "path": "intent.title"
-        },
-        {
-          "name": "riskLevel",
-          "type": "string",
-          "required": true,
-          "from": "context",
-          "path": "risk.level"
-        },
-        {
-          "name": "riskReasons",
-          "type": "array",
-          "required": true,
-          "from": "context",
-          "path": "risk.reasons"
-        },
-        {
-          "name": "suggestedAction",
-          "type": "string",
-          "required": true,
-          "from": "context",
-          "path": "intent.suggestedAction"
-        },
-        {
-          "name": "ticketId",
-          "type": "string",
-          "required": false,
-          "from": "context",
-          "path": "intent.ticketId"
-        }
+        { "name": "employeeId", "type": "string", "required": true, "from": "context", "path": "employee.id" },
+        { "name": "title", "type": "string", "required": true, "from": "context", "path": "intent.title" },
+        { "name": "date", "type": "string", "required": false, "from": "slot", "slot": "startDate" }
       ]
     },
     {
       "id": "kb.record_gap",
-      "name": "记录未命中问题",
-      "description": "知识库无命中时沉淀一条待补充知识条目，供内容运营补写。",
+      "name": "记录知识缺口",
+      "description": "知识库无命中时沉淀一条待补充知识条目，供知识运营补写。",
       "endpoint": "/api/knowledge/gaps",
       "method": "POST",
       "sideEffect": "write",
       "requiresApproval": false,
       "args": [
-        {
-          "name": "question",
-          "type": "string",
-          "required": true,
-          "from": "context",
-          "path": "intent.query"
-        },
-        {
-          "name": "domain",
-          "type": "string",
-          "required": true,
-          "from": "context",
-          "path": "intent.domain"
-        },
-        {
-          "name": "employeeId",
-          "type": "string",
-          "required": true,
-          "from": "context",
-          "path": "employee.id"
-        },
-        {
-          "name": "intentId",
-          "type": "string",
-          "required": false,
-          "from": "context",
-          "path": "intent.id"
-        }
+        { "name": "question", "type": "string", "required": true, "from": "context", "path": "intent.query" },
+        { "name": "domain", "type": "string", "required": true, "from": "context", "path": "intent.domain" },
+        { "name": "employeeId", "type": "string", "required": true, "from": "context", "path": "employee.id" },
+        { "name": "intentId", "type": "string", "required": false, "from": "context", "path": "intent.id" }
       ]
     },
     {
       "id": "log.trace",
       "name": "记录 Agent 处理日志",
-      "description": "写入一条完整的处理链路日志：意图、检索命中、风险判定、工具调用、耗时、最终动作。",
+      "description": "写入完整处理链路：意图、检索命中、风险判定、工具调用、耗时、最终动作。",
       "endpoint": "/api/logs",
       "method": "POST",
       "sideEffect": "write",
       "requiresApproval": false,
-      "args": [
-        {
-          "name": "trace",
-          "type": "object",
-          "required": true,
-          "from": "context",
-          "path": "trace"
-        }
-      ]
+      "args": [{ "name": "trace", "type": "object", "required": true, "from": "context", "path": "trace" }]
     }
   ]
 }

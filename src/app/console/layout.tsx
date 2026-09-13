@@ -2,8 +2,8 @@ import type { Metadata } from 'next';
 import { ConsoleShell } from '@/components/ConsoleShell';
 
 export const metadata: Metadata = {
-  title: '服务台后台 | 企业内部服务智能体',
-  description: '工单中心、人工审核、知识运营与效果看板。面向服务台同事。',
+  title: '人工接入后台 | 小助个人工作助手',
+  description: '人工接入、对话记录、知识运营与效果看板。面向后台处理人。',
 };
 
 export default function ConsoleLayout({ children }: { children: React.ReactNode }) {

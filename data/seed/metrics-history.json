@@ -7,8 +7,8 @@
     "autoResolved": 0,
     "escalated": 0,
     "knowledgeHit": 0,
-    "ticketsCreated": 0,
-    "approvalsCreated": 0,
+    "flowEntries": 0,
+    "humanHandoffs": 0,
     "avgLatencyMs": 0,
     "byDomain": { "IT": 0, "HR": 0, "FINANCE": 0, "ADMIN": 0, "UNKNOWN": 0 }
   },
